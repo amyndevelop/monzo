@@ -14,27 +14,36 @@ enum MembershipRole {
 }
 
 model User {
-  id            String       @id @default(cuid())
-  email         String       @unique
-  name          String?
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-  memberships   Membership[]
-  emailVerified Boolean      @default(false)
-  image         String?
-  sessions      Session[]
-  accounts      Account[]
+  id                    String             @id @default(cuid())
+  email                 String             @unique
+  name                  String?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+  memberships           Membership[]
+  emailVerified         Boolean            @default(false)
+  image                 String?
+  sessions              Session[]
+  accounts              Account[]
+  assignedConversations Conversation[]     @relation("AssignedAgent")
+  sentMessages          Message[]          @relation("MessageAuthor")
+  conversationNotes     ConversationNote[]
 }
 
 model Tenant {
-  id          String             @id @default(cuid())
-  name        String
-  slug        String             @unique
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
-  memberships Membership[]
-  settings    TenantSettings?
-  invitations TenantInvitation[]
+  id                String                 @id @default(cuid())
+  name              String
+  slug              String                 @unique
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+  memberships       Membership[]
+  settings          TenantSettings?
+  invitations       TenantInvitation[]
+  whatsappAccounts  WhatsappAccount[]
+  contacts          Contact[]
+  conversations     Conversation[]
+  messages          Message[]
+  webhookEvents     WhatsappWebhookEvent[]
+  conversationNotes ConversationNote[]
 }
 
 model Membership {
@@ -125,4 +134,161 @@ model TenantInvitation {
 
   @@unique([tenantId, email])
   @@index([expiresAt])
+}
+
+enum MessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum MessageStatus {
+  RECEIVED
+  QUEUED
+  SENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+  UNKNOWN
+  CANCELED
+}
+
+enum ConversationStatus {
+  OPEN
+  CLOSED
+}
+
+model WhatsappAccount {
+  id                String                 @id @default(cuid())
+  tenantId          String
+  tenant            Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  phoneNumberId     String                 @unique
+  businessAccountId String
+  displayPhone      String
+  displayName       String
+  tokenEncrypted    String?
+  enabled           Boolean                @default(false)
+  lastErrorCode     String?
+  verifiedAt        DateTime?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+  contacts          Contact[]
+  conversations     Conversation[]
+  messages          Message[]
+  webhookEvents     WhatsappWebhookEvent[]
+
+  @@unique([id, tenantId])
+  @@index([tenantId])
+}
+
+model Contact {
+  id            String          @id @default(cuid())
+  tenantId      String
+  tenant        Tenant          @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  accountId     String
+  account       WhatsappAccount @relation(fields: [accountId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  waId          String
+  name          String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  conversations Conversation[]
+
+  @@unique([tenantId, accountId, waId])
+  @@unique([id, accountId, tenantId])
+  @@index([tenantId, name])
+}
+
+model Conversation {
+  id             String             @id @default(cuid())
+  tenantId       String
+  tenant         Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  accountId      String
+  account        WhatsappAccount    @relation(fields: [accountId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  contactId      String
+  contact        Contact            @relation(fields: [contactId, accountId, tenantId], references: [id, accountId, tenantId], onDelete: Restrict)
+  status         ConversationStatus @default(OPEN)
+  assignedUserId String?
+  assignedUser   User?              @relation("AssignedAgent", fields: [assignedUserId], references: [id], onDelete: Restrict)
+  unreadCount    Int                @default(0)
+  lastMessageAt  DateTime           @default(now())
+  lastInboundAt  DateTime?
+  closedAt       DateTime?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  messages       Message[]
+  notes          ConversationNote[]
+
+  @@unique([accountId, contactId])
+  @@unique([id, accountId, tenantId])
+  @@unique([id, tenantId])
+  @@index([tenantId, status, lastMessageAt])
+}
+
+model Message {
+  id              String           @id @default(cuid())
+  tenantId        String
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  accountId       String
+  account         WhatsappAccount  @relation(fields: [accountId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  conversationId  String
+  conversation    Conversation     @relation(fields: [conversationId, accountId, tenantId], references: [id, accountId, tenantId], onDelete: Restrict)
+  direction       MessageDirection
+  status          MessageStatus
+  type            String
+  text            String?
+  mediaId         String?
+  providerId      String?
+  idempotencyKey  String?
+  createdByUserId String?
+  createdByUser   User?            @relation("MessageAuthor", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  errorCode       String?
+  attemptedAt     DateTime?
+  jobPublishedAt  DateTime?
+  occurredAt      DateTime
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@unique([accountId, providerId])
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, conversationId, createdAt])
+  @@index([status, createdAt])
+}
+
+model ConversationNote {
+  id             String       @id @default(cuid())
+  tenantId       String
+  tenant         Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  authorId       String
+  author         User         @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  text           String
+  createdAt      DateTime     @default(now())
+
+  @@index([tenantId, conversationId, createdAt])
+}
+
+model WhatsappWebhookEvent {
+  id             String          @id @default(cuid())
+  tenantId       String
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  accountId      String
+  account        WhatsappAccount @relation(fields: [accountId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  digest         String
+  payload        Json?
+  state          String          @default("PENDING")
+  attempts       Int             @default(0)
+  errorCode      String?
+  createdAt      DateTime        @default(now())
+  processedAt    DateTime?
+  jobPublishedAt DateTime?
+
+  @@unique([accountId, digest])
+  @@index([state, createdAt])
+}
+
+model WorkerHeartbeat {
+  id              String   @id
+  seenAt          DateTime
+  outboundEnabled Boolean  @default(false)
 }

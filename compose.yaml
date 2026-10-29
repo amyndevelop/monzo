@@ -28,6 +28,19 @@ services:
   mail:
     image: axllent/mailpit@sha256:0790692be935ea4420d085694f7985b1f692ca6a8771ab0e0bd8ba75ac180498
     ports: ['127.0.0.1:1025:1025', '127.0.0.1:8025:8025']
+  redis:
+    image: redis:7-alpine@sha256:8da19c7399dca900c6822a1cf30f9d2285585e2c4b457ff4095b0f4500054d3f
+    environment:
+      REDIS_PASSWORD: ${MONZO_REDIS_PASSWORD:?Run npm run setup:local first}
+    command: ['sh', '-c', 'exec redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"']
+    ports: ['127.0.0.1:6379:6379']
+    volumes: ['monzo_redis_data:/data']
+    healthcheck:
+      test: ['CMD-SHELL', 'REDISCLI_AUTH="$$REDIS_PASSWORD" redis-cli ping | grep -q PONG']
+      interval: 2s
+      timeout: 3s
+      retries: 20
 volumes:
+  monzo_redis_data:
   monzo_dev_data:
   monzo_test_data:

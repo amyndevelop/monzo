@@ -16,7 +16,7 @@ export function assertMutationOrigin(request: Request) {
   if (!request.headers.get('content-type')?.startsWith('application/json'))
     throw new RequestError(415, 'Se requiere JSON.');
 }
-export async function readJson(request: Request): Promise<unknown> {
+export async function readJson(request: Request, maxBytes = 8192): Promise<unknown> {
   const reader = request.body?.getReader();
   if (!reader) throw new RequestError(400, 'Solicitud vacía.');
   const chunks: Uint8Array[] = [];
@@ -25,7 +25,7 @@ export async function readJson(request: Request): Promise<unknown> {
     const { done, value } = await reader.read();
     if (done) break;
     size += value.length;
-    if (size > 8192) {
+    if (size > maxBytes) {
       await reader.cancel();
       throw new RequestError(413, 'Solicitud demasiado grande.');
     }

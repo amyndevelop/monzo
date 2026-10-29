@@ -1,5 +1,11 @@
 export const platformSections = [
   {
+    slug: 'canales',
+    label: 'Canales',
+    description: 'Conectá los canales de atención de tu empresa.',
+    icon: 'messages',
+  },
+  {
     slug: 'conversaciones',
     label: 'Conversaciones',
     description:

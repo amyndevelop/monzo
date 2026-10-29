@@ -1,4 +1,4 @@
-# Arquitectura · Fase 2
+# Arquitectura · Fase 3
 
 Monolito modular Next.js App Router, TypeScript estricto, Prisma 6.19.3 y PostgreSQL 17. React Server Components para obtener datos autorizados y componentes cliente para formularios y navegación. Inter se sirve localmente. Tailwind 4, shadcn/ui y Lucide conservan la identidad Cloud.
 
@@ -32,9 +32,23 @@ Las invitaciones se aceptan una sola vez, con sesión verificada del email desti
 
 El cliente hace una navegación de documento completa después de login, logout, aceptación de invitación o cambio de empresa para descartar el cache del router de la identidad/empresa anterior. La autorización sigue estando en el servidor.
 
-## Worker e integraciones futuras
+## WhatsApp y worker
 
-El worker Node independiente con Redis/BullMQ sigue pendiente. Las futuras tareas largas se encolarán con idempotencia y límites por tenant, sin depender de la vida de un request Vercel. No se incorporaron OpenAI, Meta, conversaciones operativas, CRM, pagos o métricas reales. No se crearon microservicios.
+La web Next.js y el proceso Node independiente comparten PostgreSQL. Redis/BullMQ ejecuta tareas sin depender de la duración de un request Vercel. `src/modules/whatsapp/service.ts` entrega DTOs autorizados y el núcleo se comparte con el worker. IA, CRM, pagos y métricas operativas siguen pendientes.
+
+El webhook verifica HMAC sobre bytes originales y almacena eventos separados por cuenta/empresa antes de responder 200. El dispatcher consulta pendientes cada tres segundos. Cada transacción procesa como máximo 25 mensajes o 50 estados; bloquea evento y empresa, deduplica por ID de Meta, crea contacto/hilo y vacía el payload procesado. Hay ocho intentos con espera exponencial y reencolado manual por OWNER.
+
+Los envíos se guardan QUEUED con UUID idempotente. Antes de HTTP, el worker revalida membresía, cuenta y ventana de 24 horas y reclama SENDING bajo bloqueo. Duplicados no repiten registros reclamados. Solo QUEUED puede recuperarse de un job fallido. Una interrupción después de reclamar pasa a UNKNOWN; no se reenvía automáticamente. Los recibos firmados reconcilian por ID de Meta o `biz_opaque_callback_data`, sin retroceder SENT/DELIVERED/READ.
+
+La tercera migración agrega WhatsappAccount, Contact, Conversation, Message, ConversationNote, WhatsappWebhookEvent y WorkerHeartbeat, conservando las dos anteriores. Relaciones compuestas impiden cruzar cuenta/contacto/hilo/empresa. Los tokens usan AES-256-GCM con AAD de empresa/número. Heartbeat indica actividad reciente y no garantiza entrega.
+
+La UI consulta listas cada cinco segundos e hilos cada cuatro. Historial por cursor de 50 mensajes, notas privadas y asignación a miembros actuales. Cerrar no impide recepción: un mensaje nuevo reabre, usando la precisión de segundos de Meta. Mensajes demorados anteriores al cierre no reabren. Ver límites y preparación de producción en `docs/phase-3.md`.
+
+## Procesamiento por eventos sin servidor permanente
+
+El modo `WHATSAPP_PROCESSOR=qstash` conserva el mismo núcleo y PostgreSQL, pero publica IDs por HTTPS a QStash. Vercel recibe `/api/jobs/whatsapp` con JWT firmado sobre cuerpo y URL exactos; la biblioteca oficial admite ambas claves de rotación. Redis y el proceso permanente no se usan en este modo.
+
+La cuarta migración agrega `jobPublishedAt` a eventos y mensajes. La web espera aceptación de la cola; fallos dejan datos durables y un error visible, sin afirmar envío. Se solicitan dos reintentos. Un watchdog demorado marca intentos interrumpidos como UNKNOWN; el propietario puede revisar/reprogramar pendientes de su empresa. No hay polling continuo de base ni cron. Las cuotas gratuitas deben verificarse en el panel; cada entrega/reintento consume cuota. Ver `docs/phase-3.md`.
 
 ## Entornos
 

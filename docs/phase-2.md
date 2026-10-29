@@ -18,13 +18,13 @@ Las pruebas de navegador recorren registro, correo de verificación capturado en
 
 El resumen de resultados queda en `docs/progress.md`. Los logs de contraseñas incorrectas y origen rechazado son resultados negativos esperados; no deben confundirse con fallos de infraestructura.
 
-## Publicación pendiente
+## Publicación y comprobación en producción
 
 Se preparó Neon monzo-db y el usuario confirmó las 10 tablas y 2 migraciones. Resend muestra el dominio remitente verificado y el usuario confirmó haber guardado la configuración de producción en Vercel. Las variables requeridas son `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_FROM`, `SMTP_USER` y `SMTP_PASSWORD`, sin escribir secretos en el repositorio o el chat.
 
 La URL de autenticación debe coincidir exactamente con el dominio HTTPS publicado; no usar comodines de confianza para dominios Preview. Usar otra base y otro secreto para Preview. No migrar una base compartida o de producción automáticamente durante un build. Primero revisar/aplicar las migraciones en el entorno correspondiente y después desplegar el código autorizado.
 
-Sin configuración válida, las pantallas de cuenta indican que el acceso está en preparación y las APIs no admiten una sesión falsa. La entrega externa de mensajes y el acceso HTTPS se comprueban después del despliegue. La aplicación del esquema de producción fue confirmada por el usuario mediante la consulta de tablas y migraciones.
+Sin configuración válida, las pantallas de cuenta indican que el acceso está en preparación y las APIs no admiten una sesión falsa. La aplicación del esquema de producción fue confirmada por el usuario mediante la consulta de tablas y migraciones. Tras el push `1021164`, el usuario confirmó entrega externa de correo, verificación, ingreso HTTPS, creación de empresa y acceso al dashboard mediante capturas. La comprobación de flags de cookies, recuperación, invitaciones y aislamiento entre cuentas en producción sigue pendiente; esos controles pasaron localmente.
 
 ## Fuera de alcance
 

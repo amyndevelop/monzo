@@ -1,4 +1,4 @@
-# Controles de acceso y seguridad · Fase 2
+# Controles de acceso y seguridad · Fase 3
 
 ## Identidad y sesiones
 
@@ -10,13 +10,18 @@ La vinculación automática de cuentas está deshabilitada. No hay login univers
 
 ## Matriz de permisos
 
-| Operación en una empresa              | OWNER | ADMIN | MEMBER |
-| ------------------------------------- | ----- | ----- | ------ |
-| Ver inicio, preferencias y equipo     | Sí    | Sí    | Sí     |
-| Cambiar nombre, idioma y zona horaria | Sí    | Sí    | No     |
-| Invitar miembros/admins               | Sí    | No    | No     |
-| Cambiar roles o revocar membresías    | Sí    | No    | No     |
-| Quitar/demover al último propietario  | No    | No    | No     |
+| Operación en una empresa                         | OWNER | ADMIN | MEMBER |
+| ------------------------------------------------ | ----- | ----- | ------ |
+| Ver inicio, preferencias y equipo                | Sí    | Sí    | Sí     |
+| Cambiar nombre, idioma y zona horaria            | Sí    | Sí    | No     |
+| Invitar miembros/admins                          | Sí    | No    | No     |
+| Cambiar roles o revocar membresías               | Sí    | No    | No     |
+| Quitar/demover al último propietario             | No    | No    | No     |
+| Autorizar/desconectar número Meta                | Sí    | No    | No     |
+| Reintentar recepciones fallidas                  | Sí    | No    | No     |
+| Leer hilos/contactos, responder, anotar y cerrar | Sí    | Sí    | Sí     |
+| Asignar conversación a otro miembro              | Sí    | Sí    | No     |
+| Asignarse o desasignarse a sí mismo              | Sí    | Sí    | Sí     |
 
 Una cuenta verificada puede crear hasta 20 empresas propias. Siempre se asigna OWNER en el servidor; no se acepta un rol enviado en ese formulario. El creador de una cuenta no recibe permisos en empresas ajenas. Los listados de membresías y equipos están acotados a 100 resultados: paginación para equipos mayores queda pendiente.
 
@@ -34,7 +39,7 @@ Si SMTP falla, no se muestra éxito. Una invitación pendiente puede haber queda
 
 ## Solicitudes y abuso
 
-Las mutaciones de negocio usan POST/PATCH/DELETE, origen exacto, tipo JSON, límite de 8 KiB y esquemas Zod estrictos. Better Auth aplica su protección de origen a autenticación. Los endpoints de negocio devuelven errores genéricos sin URLs de conexión, stacktraces o cuerpos de solicitud. Las respuestas de datos privados llevan `Cache-Control: no-store`.
+Las mutaciones de negocio usan POST/PATCH/DELETE, origen exacto, tipo JSON, límite de 8 KiB (24 KiB para respuestas, 16 KiB para notas) y esquemas Zod estrictos. Better Auth aplica su protección de origen a autenticación. Los endpoints de negocio devuelven errores genéricos sin URLs de conexión, stacktraces o cuerpos de solicitud. Las respuestas de datos privados llevan `Cache-Control: no-store`.
 
 Los límites de autenticación se guardan en PostgreSQL para compartirlos entre instancias: 8 intentos de login, 5 registros y 3 solicitudes de recuperación/reenvío por minuto e IP, además del límite general. En Vercel se utiliza `x-vercel-forwarded-for`; en desarrollo `x-forwarded-for`. Cualquier otro hosting debe configurar un proxy de confianza que sobrescriba ese encabezado antes de exponer el servicio. Estos límites no sustituyen WAF, monitoreo o protección distribuida de abuso.
 
@@ -45,3 +50,19 @@ Los límites de autenticación se guardan en PostgreSQL para compartirlos entre 
 Los enlaces de verificación, recuperación e invitación contienen tokens sensibles: no copiarlos a logs, analíticas o chat. No se integraron analíticas de terceros en esas páginas. Las páginas de cuenta no se indexan. Los reportes de pruebas con cuentas efímeras no se suben a GitHub.
 
 Antes de producción: configurar secretos, PostgreSQL y SMTP separados de desarrollo; revisar migraciones; comprobar cookie Secure bajo HTTPS y entrega externa real; realizar pruebas de acceso tras despliegue. No se afirma auditoría independiente, cumplimiento normativo ni cobertura de amenazas fuera de estas comprobaciones.
+
+## WhatsApp
+
+El webhook público no usa sesión ni origen de navegador: valida HMAC-SHA256 sobre bytes originales, con comparación constante y App Secret real. Su Verify Token solo sirve para el desafío GET y no firma mensajes. Se limita el cuerpo a 1 MiB y se valida antes de persistir. Cada evento se asocia únicamente a un número habilitado y a la WABA correspondiente; el cliente no elige tenantId.
+
+Los tokens de Meta usan AES-256-GCM con IV aleatorio y AAD de empresa/número, nunca se devuelven en DTOs, logs o Redis. Web y worker comparten la clave secreta; no se admite sustituirla por un placeholder de proxy porque el proceso la usa para cifrado. La autorización exige comprobar que el número pertenece a la WABA y suscribir la app. Las llamadas usan host y paths fijos, TLS verificado, proxy del entorno, timeout y prohibición de redirecciones.
+
+Las respuestas requieren membresía actual y ventana de 24 horas, revalidadas al reclamar el envío. Idempotencia UUID y bloqueo transaccional evitan repetir un registro; un resultado externo incierto queda UNKNOWN sin reintento automático. No se promete entrega exactly-once. Un rechazo antiguo de token no invalida una credencial renovada durante la petición. Desconexión y revocación impiden pendientes, sin poder retirar una solicitud ya enviada a Meta.
+
+Redis remoto exige TLS. El contenedor corre como usuario sin privilegios, excluye .env y contiene un chequeo de heartbeat. Los payloads procesados se vacían; el worker BullMQ depura registros DONE a los siete días, mientras QStash conserva esos metadatos hasta limpieza administrativa; fallidos conservan payload para revisión. Mensajes y notas no tienen borrado automático: definir retención antes de incorporar datos de clientes externos. La preparación y los límites de producción están en `docs/phase-3.md`.
+
+## Entregas QStash
+
+En modo qstash el endpoint de trabajos no usa sesión: requiere una firma QStash válida, distinta de la firma de Meta. La biblioteca oficial verifica JWT, emisor, vigencia, cuerpo original y URL configurada. Admite claves actual/siguiente; sin claves válidas no procesa trabajos. Cuerpo máximo 2 KiB y esquema estricto tipo/ID, sin tenantId elegido por el emisor. El endpoint queda deshabilitado en modo BullMQ.
+
+La publicación solo admite destinos oficiales de Upstash, TLS verificado y sin redirecciones, preservando el proxy. Las colas contienen IDs, nunca contenido ni tokens de Meta. La recuperación exige OWNER y bloquea/revalida su membresía; solo selecciona pendientes de esa empresa. El callback conserva las mismas comprobaciones de ventana, cuenta y actor que el worker. UNKNOWN no se reenvía. Los transportes reales rechazan la base monzo_test: fixtures nunca publican a QStash ni Meta.

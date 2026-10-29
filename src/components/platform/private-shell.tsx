@@ -67,9 +67,9 @@ export function PrivateShell({
               aria-current={path === `/dashboard/${section.slug}` ? 'page' : undefined}
             >
               {section.label}
-              {!['equipo', 'configuracion'].includes(section.slug) && (
-                <span className="nav-soon" aria-label="Próximamente" />
-              )}
+              {!['equipo', 'configuracion', 'canales', 'contactos', 'conversaciones'].includes(
+                section.slug,
+              ) && <span className="nav-soon" aria-label="Próximamente" />}
             </Link>
           ))}
         </nav>

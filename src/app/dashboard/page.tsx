@@ -30,11 +30,11 @@ export default async function Dashboard() {
           <p>
             Administrá las personas y preferencias de tu empresa.
             <br />
-            Los canales, agentes y automatizaciones llegarán en próximas fases.
+            Conectá WhatsApp y acompañá a tus clientes desde la bandeja.
           </p>
           <Button asChild>
-            <Link href="/dashboard/equipo">
-              Ver mi equipo <ArrowRight size={17} />
+            <Link href="/dashboard/conversaciones">
+              Abrir conversaciones <ArrowRight size={17} />
             </Link>
           </Button>
         </div>

@@ -1,6 +1,6 @@
-# MONZO · Fase 2
+# MONZO · Fase 3 en desarrollo
 
-Plataforma SaaS en desarrollo. Landing comercial, demo pública y acceso real por cuenta verificada a espacios independientes de empresa. La Fase 1 está publicada y esta entrega prepara la Fase 2. El push autorizado a main activa el despliegue automático de Vercel; el estado y los flujos reales de producción se verifican por separado.
+Plataforma SaaS en desarrollo. Landing comercial, demo pública y acceso real por cuenta verificada a espacios independientes de empresa. Las Fases 1 y 2 están publicadas. Esta rama prepara WhatsApp y la bandeja, todavía sin despliegue ni conexión real a Meta. El push autorizado a main activa el despliegue automático de Vercel; el estado y los flujos reales de producción se verifican por separado.
 
 ## Desarrollo local
 
@@ -35,7 +35,9 @@ Abrir el sitio local en el origen exacto de `BETTER_AUTH_URL`, inicialmente `htt
 | `/dashboard/configuracion`             | Preferencias; propietarios y administradores pueden modificar         |
 | `/invitacion`                          | Aceptación explícita con cuenta del correo invitado, verificada       |
 
-Los canales, IA, conversaciones operativas, CRM, pagos y automatizaciones siguen marcados como próximos. No se muestran métricas inventadas ni se afirman integraciones que no existen.
+Esta rama agrega `/dashboard/canales`, `/dashboard/conversaciones`, `/dashboard/contactos` y `/api/webhooks/whatsapp`. La integración requiere una app real de Meta y un procesador configurado (QStash por eventos o worker BullMQ); `setup:local` no simula una conexión. IA, plantillas, CRM, pagos y automatizaciones siguen pendientes. Ver [Fase 3](docs/phase-3.md).
+
+Compose incluye Redis 7 con contraseña en `127.0.0.1:6379`, DB 0 para desarrollo y DB 1 para pruebas. Para procesar mensajes de desarrollo, abrir otra terminal en este directorio y ejecutar `npm run worker`. Web y worker comparten base y clave de cifrado. Con `WHATSAPP_PROCESSOR=qstash`, Vercel ejecuta los trabajos mediante callbacks firmados y no hace falta Redis ni proceso permanente. Esta es la ruta elegida para las pruebas con presupuesto gratuito; confirmar plan/cuotas Free en Upstash. El modo BullMQ permanece disponible para desarrollo o un servidor propio. `Dockerfile.worker` crea la imagen de producción sin archivos de secretos, con usuario sin privilegios y comprobación de salud.
 
 ## Verificación
 
@@ -46,9 +48,10 @@ npm run lint
 npm run format:check
 npm run build
 npm test
+npm run test:qstash
 ```
 
-Las pruebas arrancan su propio servidor de producción local en el puerto 3100 con `.env.test`; migran solamente la instancia `127.0.0.1:55433/monzo_test`. El runner rechaza otra ubicación. No resetean ni migran `monzo_dev` o producción. Usan SMTP real contra Mailpit, cuentas y empresas generadas expresamente para pruebas, y Chromium preinstalado o `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`. En otro equipo puede instalarse con `npx playwright install chromium`.
+`test:qstash` prueba por separado callbacks HTTP firmados sin worker permanente; no envía credenciales ficticias a QStash o Meta. Las pruebas arrancan su propio servidor de producción local en el puerto 3100 con `.env.test`; migran solamente la instancia `127.0.0.1:55433/monzo_test`. El runner rechaza otra ubicación y también restringe Redis a DB 1 local. Inicia un worker real de recepción; las llamadas salientes a Meta se verifican con transportes inyectados y nunca envían credenciales ficticias a Internet. No resetean ni migran `monzo_dev` o producción. Usan SMTP real contra Mailpit, cuentas y empresas generadas expresamente para pruebas, y Chromium preinstalado o `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH`. En otro equipo puede instalarse con `npx playwright install chromium`.
 
 Los datos de prueba permanecen en la base de pruebas, nunca en la aplicación de producción. Las capturas y reportes se escriben en `test-results/` y `playwright-report/`, ignorados por Git. No ejecutar desarrollo y build simultáneamente: comparten `.next`.
 
@@ -60,11 +63,11 @@ Prisma prepara el esquema y las migraciones aditivas versionadas. Better Auth ge
 
 `db:migrate` aplica migraciones pendientes; no contiene resets ni borrados de tablas. Para una base existente sin historial Prisma, verificar su esquema y preparar un baseline revisado por separado. No usar `db push` o marcar migraciones como aplicadas a ciegas.
 
-## Publicación de Fase 2
+## Publicación
 
 Antes de habilitar cuentas reales en Vercel hacen falta una base PostgreSQL gestionada, un proveedor SMTP con remitente verificado, `BETTER_AUTH_URL` con el dominio HTTPS real y un `BETTER_AUTH_SECRET` aleatorio. Guardarlos en Vercel, nunca en Git ni en el chat. Usar bases y secretos separados para desarrollo, Preview y Production. Vercel no ejecuta Docker Compose.
 
-Las páginas de acceso informan que el servicio aún no está habilitado si la configuración está incompleta; las APIs privadas deniegan el acceso. No hay modo de autenticación simulado ni bypass de verificación en producción. Las migraciones de producción, el merge a `main` y el despliegue necesitan una instrucción explícita. Ver [Fase 2](docs/phase-2.md) y [seguridad](docs/security.md).
+Las páginas de acceso informan que el servicio aún no está habilitado si la configuración está incompleta; las APIs privadas deniegan el acceso. No hay modo de autenticación simulado ni bypass de verificación en producción. Las migraciones de producción, el merge a `main` y el despliegue necesitan una instrucción explícita. La Fase 2 está publicada en `https://monzo-v.vercel.app`; el usuario confirmó correo, verificación, acceso y creación de empresa. Ver [Fase 2](docs/phase-2.md), [Fase 3](docs/phase-3.md) y [seguridad](docs/security.md).
 
 ## Estructura
 
@@ -72,6 +75,8 @@ Las páginas de acceso informan que el servicio aún no está habilitado si la c
 - `src/modules/auth/`: Better Auth, configuración y correo, solo servidor donde corresponde.
 - `src/modules/access/`: identidad y autorización de cada solicitud.
 - `src/modules/tenants/`: datos de empresa, roles, preferencias e invitaciones.
+- `src/modules/whatsapp/`: autorización, cifrado, ingestión y contrato de Meta.
+- `workers/`: proceso independiente Redis/BullMQ y comprobación de salud.
 - `src/components/`: branding, UI Cloud, formularios y navegación.
 - `prisma/`: modelos y migraciones.
 - `scripts/`: preparación de desarrollo y runner aislado de pruebas.

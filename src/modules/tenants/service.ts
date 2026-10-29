@@ -129,8 +129,13 @@ export async function changeMembership(
         (await tx.membership.count({ where: { tenantId, role: 'OWNER' } })) <= 1
       )
         throw new RequestError(409, 'La empresa debe conservar al menos un propietario.');
-      if (remove) await tx.membership.delete({ where: { id: target.id } });
-      else await tx.membership.update({ where: { id: target.id }, data: { role } });
+      if (remove) {
+        await tx.conversation.updateMany({
+          where: { tenantId, assignedUserId: target.userId },
+          data: { assignedUserId: null },
+        });
+        await tx.membership.delete({ where: { id: target.id } });
+      } else await tx.membership.update({ where: { id: target.id }, data: { role } });
       return { ok: true };
     },
     { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted },

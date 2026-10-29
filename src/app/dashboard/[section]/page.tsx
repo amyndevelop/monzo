@@ -5,6 +5,9 @@ import { getWorkspace, listMembers } from '@/modules/tenants/service';
 import { SettingsForm } from '@/components/platform/settings-form';
 import { TeamManager } from '@/components/platform/team-manager';
 import { getSection } from '@/modules/platform/navigation';
+import { Inbox } from '@/components/whatsapp/inbox';
+import { ChannelsPanel } from '@/components/whatsapp/channels-panel';
+import { Contacts } from '@/components/whatsapp/contacts';
 import { Mascot } from '@/components/brand/mascot';
 export async function generateMetadata({
   params,
@@ -13,7 +16,13 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   return { title: getSection((await params).section)?.label ?? 'Página no encontrada' };
 }
-export default async function Section({ params }: { params: Promise<{ section: string }> }) {
+export default async function Section({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ section: string }>;
+  searchParams: Promise<{ conversation?: string }>;
+}) {
   const context = await requireDashboardContext();
   const { section } = await params;
   const item = getSection(section);
@@ -30,7 +39,18 @@ export default async function Section({ params }: { params: Promise<{ section: s
           <p>{item.description}</p>
         </div>
       </div>
-      {section === 'equipo' ? (
+      {section === 'conversaciones' ? (
+        <Inbox
+          tenantId={context.tenant.id}
+          userId={context.user.id}
+          canAssign={context.membership.role !== 'MEMBER'}
+          initialConversation={(await searchParams).conversation}
+        />
+      ) : section === 'canales' ? (
+        <ChannelsPanel tenantId={context.tenant.id} />
+      ) : section === 'contactos' ? (
+        <Contacts tenantId={context.tenant.id} />
+      ) : section === 'equipo' ? (
         <TeamManager
           tenantId={context.tenant.id}
           members={await listMembers(context.tenant.id)}

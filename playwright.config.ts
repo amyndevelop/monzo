@@ -5,6 +5,7 @@ const executablePath =
   (existsSync('/usr/bin/chromium') ? '/usr/bin/chromium' : undefined);
 export default defineConfig({
   testDir: './tests',
+  testIgnore: process.env.WHATSAPP_PROCESSOR === 'qstash' ? [] : ['**/qstash.spec.ts'],
   fullyParallel: true,
   workers: 2,
   forbidOnly: !!process.env.CI,
