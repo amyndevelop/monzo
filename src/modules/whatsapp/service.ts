@@ -7,7 +7,7 @@ import { RequestError, idSchema } from '@/modules/tenants/http';
 import { encryptToken, whatsappConfigured } from './core/crypto';
 import { verifyAndSubscribe, MetaError } from './core/meta';
 import { withinWindow } from './core/payload';
-import { dispatchJobs, processorMode, qstashConfigured } from './core/qstash';
+import { dispatchJobs, processorMode, qstashConfigurationIssues } from './core/qstash';
 const accountFields = {
   id: true,
   phoneNumberId: true,
@@ -61,6 +61,7 @@ export async function channelStatus(tenantId: string) {
       : 0,
   ]);
   const recent = Boolean(heartbeat && heartbeat.seenAt.getTime() > Date.now() - 45000);
+  const processorIssues = mode === 'qstash' ? qstashConfigurationIssues() : [];
   return {
     accounts,
     configured: whatsappConfigured(),
@@ -70,7 +71,10 @@ export async function channelStatus(tenantId: string) {
     failedEvents,
     processorMode: mode,
     processorReady:
-      mode === 'qstash' ? qstashConfigured() : recent && Boolean(heartbeat?.outboundEnabled),
+      mode === 'qstash'
+        ? processorIssues.length === 0
+        : recent && Boolean(heartbeat?.outboundEnabled),
+    processorIssues: membership.role === 'OWNER' ? processorIssues : [],
     pendingJobs: pendingEvents + pendingMessages,
   };
 }

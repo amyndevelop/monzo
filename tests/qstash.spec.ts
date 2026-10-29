@@ -7,6 +7,7 @@ import {
   dispatchJobs,
   processJob,
   publishJobs,
+  qstashConfigurationIssues,
   verifyJob,
   type WhatsappJob,
   type QueueFetch,
@@ -51,6 +52,26 @@ async function saveOutbound(f: Awaited<ReturnType<typeof fixture>>, conversation
   });
   return { saved, key, path };
 }
+test('diagnóstico privado identifica variables faltantes sin devolver secretos y solo para OWNER', async () => {
+  const f = await fixture();
+  const path = `/api/workspaces/${f.tenant.id}/whatsapp/accounts`;
+  const response = await f.api.get(path);
+  expect(response.ok()).toBe(true);
+  const body = await response.json();
+  expect(body.processorReady).toBe(false);
+  expect(body.processorIssues).toEqual(['QSTASH_TOKEN']);
+  expect(JSON.stringify(body)).not.toContain(process.env.QSTASH_CURRENT_SIGNING_KEY!);
+  expect(JSON.stringify(body)).not.toContain(process.env.QSTASH_NEXT_SIGNING_KEY!);
+  await db.membership.update({
+    where: { tenantId_userId: { tenantId: f.tenant.id, userId: f.user.id } },
+    data: { role: 'MEMBER' },
+  });
+  const member = await (await f.api.get(path)).json();
+  expect(member.processorReady).toBe(false);
+  expect(member.processorIssues).toEqual([]);
+  expect(member.canManage).toBe(false);
+  await f.api.dispose();
+});
 test('callback: firma, rotación, caducidad, destino y cuerpo original', async ({ request }) => {
   const raw = JSON.stringify({ kind: 'inbox', id: 'nonexistent-fixture-id' });
   expect(await verifyJob(raw, signature(raw))).toBe(true);
@@ -149,8 +170,22 @@ test('contrato QStash publica solamente IDs, conserva fallos y evita republicar 
       publishJobs([job], async () => ({ ok: true, json: async () => [] })),
     ).rejects.toThrow('QSTASH_RESPONSE_UNKNOWN');
     const oldUrl = process.env.QSTASH_URL;
+    process.env.QSTASH_URL = '"https://qstash-us-east-1.upstash.io"';
+    try {
+      expect(qstashConfigurationIssues()).toEqual([]);
+      await publishJobs([job], async (url) => {
+        expect(url).toBe('https://qstash-us-east-1.upstash.io/v2/batch');
+        return { ok: true, json: async () => [{ messageId: 'msg-us-fixture' }] };
+      });
+      process.env.QSTASH_URL = 'https://qstash-us-east-1.upstash.io/v2/publish';
+      expect(qstashConfigurationIssues()).toEqual(['QSTASH_URL']);
+    } finally {
+      if (oldUrl === undefined) delete process.env.QSTASH_URL;
+      else process.env.QSTASH_URL = oldUrl;
+    }
     process.env.QSTASH_URL = 'https://sitio-ajeno.test';
     try {
+      expect(qstashConfigurationIssues()).toEqual(['QSTASH_URL']);
       await expect(publishJobs([job], transport)).rejects.toThrow('QSTASH_NOT_CONFIGURED');
     } finally {
       if (oldUrl === undefined) delete process.env.QSTASH_URL;

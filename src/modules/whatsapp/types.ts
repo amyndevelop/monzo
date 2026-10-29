@@ -17,6 +17,7 @@ export type Channels = {
   failedEvents: number;
   processorMode: 'bullmq' | 'qstash';
   processorReady: boolean;
+  processorIssues: string[];
   pendingJobs: number;
 };
 export type ChatMessage = {

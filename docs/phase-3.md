@@ -1,6 +1,6 @@
 # Fase 3 · WhatsApp Cloud API y bandeja
 
-Estado: código integrado y subido a `main` en `a3083f9`, después de confirmar la migración de producción. El usuario mostró la nueva pantalla privada de Canales funcionando en `https://monzo-v.vercel.app/dashboard/canales`. La configuración del webhook y el recorrido real de mensajes desde/hacia MONZO siguen pendientes.
+Estado: código integrado y subido a `main` en `a3083f9`, seguido por el ajuste de autocompletado `15f5f87`. El usuario confirmó el esquema de producción y mostró Canales funcionando, webhook marcado como completo en Meta y número de prueba autorizado mediante MONZO. La configuración QStash aparece en pausa con un pendiente y requiere corrección; el recorrido real de mensajes desde/hacia MONZO todavía no está comprobado.
 
 ## Ruta sin servidor permanente · Vercel + QStash
 
@@ -30,7 +30,7 @@ La migración adicional `202610290004_event_dispatch` agrega `jobPublishedAt` a 
 
 El usuario creó su cuenta QStash: su captura muestra **Free** en EU Region y US Region. Se indicó US Region y confirmó haber guardado en Vercel las cinco variables de QStash/procesador, además de las tres de Meta/cifrado. No se leyeron esos valores ni se comprobó su conexión real desde este entorno. La captura no muestra la cuota exacta. El usuario también creó su app de Meta y recibió la prueba enviada desde la consola del proveedor; ese mensaje todavía no verifica el recorrido de MONZO.
 
-Pasos pendientes: publicar esta fase, configurar webhook en Meta y validar un mensaje completo desde/hacia MONZO. Neon ya tiene las siete tablas nuevas, cuatro migraciones aplicadas y las dos columnas de cola, según la comprobación del usuario.
+Pasos pendientes: corregir la configuración de QStash en Vercel, volver a desplegar, recuperar el trabajo pendiente y validar un mensaje completo desde/hacia MONZO. Neon ya tiene las siete tablas nuevas, cuatro migraciones aplicadas y las dos columnas de cola, según la comprobación del usuario.
 
 ### Actualización manual de Neon antes de publicar
 

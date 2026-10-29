@@ -148,6 +148,24 @@ export function ChannelsPanel({ tenantId }: { tenantId: string }) {
               revisá el servicio de procesamiento con el administrador.
             </p>
           )}
+          {data.canManage && data.processorIssues?.length > 0 && (
+            <div className="form-error" role="alert">
+              <p>Hay que completar la configuración del procesamiento en Vercel Production.</p>
+              <ul>
+                {data.processorIssues.map((name) => (
+                  <li key={name}>
+                    <strong>{name}</strong>:{' '}
+                    {name === 'QSTASH_URL'
+                      ? 'Revisá que sea la URL base HTTPS de QStash, sin rutas ni texto extra.'
+                      : name === 'BETTER_AUTH_URL'
+                        ? 'Revisá el origen HTTPS de MONZO.'
+                        : 'Falta un valor para esta variable.'}
+                  </li>
+                ))}
+              </ul>
+              <p>Después de guardar las variables, volvé a desplegar para aplicar sus valores.</p>
+            </div>
+          )}
           {data.processorMode === 'qstash' && data.pendingJobs > 0 && data.canManage && (
             <div className="form-message">
               <p>Hay {data.pendingJobs} trabajos pendientes de programación o revisión.</p>

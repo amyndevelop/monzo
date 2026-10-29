@@ -32,7 +32,12 @@ export function callbackUrl() {
   return new URL('/api/jobs/whatsapp', origin).href;
 }
 function endpoint() {
-  const url = new URL(process.env.QSTASH_URL || 'https://qstash.upstash.io');
+  const raw = (process.env.QSTASH_URL || 'https://qstash.upstash.io').trim();
+  // Admin dashboards preserve quotes copied from .env examples. Normalize the public URL only;
+  // the HTTPS/host/path checks below still apply and credential values are never altered.
+  const quoted =
+    (raw.startsWith('"') && raw.endsWith('"')) || (raw.startsWith("'") && raw.endsWith("'"));
+  const url = new URL(quoted ? raw.slice(1, -1).trim() : raw);
   if (
     url.protocol !== 'https:' ||
     url.username ||
@@ -46,18 +51,24 @@ function endpoint() {
     throw new Error('INVALID_QSTASH_URL');
   return new URL('/v2/batch', url).href;
 }
-export function qstashConfigured() {
+export function qstashConfigurationIssues() {
+  const issues = ['QSTASH_TOKEN', 'QSTASH_CURRENT_SIGNING_KEY', 'QSTASH_NEXT_SIGNING_KEY'].filter(
+    (name) => !process.env[name]?.trim(),
+  );
   try {
     callbackUrl();
-    endpoint();
-    return Boolean(
-      process.env.QSTASH_TOKEN &&
-      process.env.QSTASH_CURRENT_SIGNING_KEY &&
-      process.env.QSTASH_NEXT_SIGNING_KEY,
-    );
   } catch {
-    return false;
+    issues.push('BETTER_AUTH_URL');
   }
+  try {
+    endpoint();
+  } catch {
+    issues.push('QSTASH_URL');
+  }
+  return issues;
+}
+export function qstashConfigured() {
+  return qstashConfigurationIssues().length === 0;
 }
 export type QueueFetch = (
   url: string,

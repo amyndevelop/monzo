@@ -129,3 +129,15 @@ La entrega se integró y subió a main en el commit `a3083f9`; el push y su SHA 
 La captura muestra un correo en el campo de ID empresarial y un valor oculto en el token, compatibles con autocompletado del navegador. Se ajustaron las indicaciones y atributos de autocompletado del formulario de credenciales para reducir la confusión con un login. El token continúa oculto y el servidor sigue exigiendo IDs numéricos y autorización real de Meta. El usuario debe sustituir los datos autocompletados por los identificadores y el token de Meta. Próximo paso externo: callback y suscripción messages, luego autorizar el número de prueba y validar ambos sentidos.
 
 El ajuste del formulario pasó lint y compilación de producción, incluida la comprobación TypeScript. La validación con el perfil de Chrome del usuario y su gestor de credenciales sigue siendo una comprobación externa; los atributos reducen el autocompletado y no garantizan el comportamiento de todas las extensiones.
+
+## Meta autorizado · Configuración QStash pendiente de corregir
+
+El usuario mostró el webhook marcado como completo en Meta y luego la autorización exitosa del número de prueba desde MONZO: la UI confirmó número/suscripción y mostró la tarjeta Test Number autorizada. Eso verifica las llamadas de autorización contra Meta en producción; la entrega bidireccional todavía no está comprobada. La captura también muestra procesamiento pausado y un trabajo pendiente, por lo que la comprobación local de configuración QStash no pasa. No prueba una caída del proveedor.
+
+El usuario compartió únicamente la URL pública de la región US, `https://qstash-us-east-1.upstash.io`, entre comillas. La documentación oficial de Upstash confirma esa dirección. Se indicó guardarla sin comillas; no se sabe si las comillas formaban parte del valor en Vercel o solo del mensaje. No se solicitaron tokens o claves.
+
+Se añadió diagnóstico en Canales que comunica al OWNER solamente nombres de variables faltantes o de URL/origen con formato inválido. No devuelve valores ni expone esos detalles a MEMBER. La comprobación sigue distinguiendo configuración de disponibilidad/entrega real. Tras corregir variables y volver a desplegar, recuperar pendientes desde la UI antes de validar recepción y respuesta.
+
+También se normalizan espacios y un par de comillas exteriores en la URL pública de QStash, para admitir valores copiados desde ejemplos .env. Se mantienen HTTPS, host oficial, ruta base, ausencia de credenciales/redirecciones y validación TLS. No se modifican tokens ni claves. La prueba del contrato verifica la región US entre comillas y sigue rechazando una ruta /v2/publish o un host ajeno.
+
+El usuario confirmó haber actualizado todas las variables sin comillas. El siguiente despliegue debe tomar esos valores; no se verificaron directamente. El ajuste pasó lint, compilación con TypeScript y los 16 casos de QStash (incluido diagnóstico privado y URL US normalizada). Después del despliegue, confirmar que se habilitó el procesamiento, recuperar pendientes y probar recepción/respuesta reales. No volver a autorizar o desconectar el número si la autorización actual sigue válida.
