@@ -209,10 +209,12 @@ export function ChannelsPanel({ tenantId }: { tenantId: string }) {
               <h2>Conectar o actualizar un número</h2>
               <p>
                 Usá los datos de WhatsApp Business Cloud API de tu aplicación de Meta. El token se
-                guarda cifrado y nunca se vuelve a mostrar.
+                guarda cifrado y nunca se vuelve a mostrar. Copiá los dos identificadores numéricos
+                y el token de acceso que aparecen en Meta.
               </p>
               <form
                 className="account-form"
+                autoComplete="off"
                 onSubmit={async (event) => {
                   event.preventDefault();
                   setBusy(true);
@@ -242,7 +244,10 @@ export function ChannelsPanel({ tenantId }: { tenantId: string }) {
                   ID de la cuenta de WhatsApp Business
                   <input
                     name="businessAccountId"
+                    autoComplete="off"
+                    spellCheck={false}
                     inputMode="numeric"
+                    placeholder="Identificador numérico de Meta"
                     pattern="[0-9]{5,30}"
                     required
                     disabled={!data.configured || busy}
@@ -252,7 +257,10 @@ export function ChannelsPanel({ tenantId }: { tenantId: string }) {
                   ID del número de teléfono
                   <input
                     name="phoneNumberId"
+                    autoComplete="off"
+                    spellCheck={false}
                     inputMode="numeric"
+                    placeholder="Identificador numérico de Meta"
                     pattern="[0-9]{5,30}"
                     required
                     disabled={!data.configured || busy}
@@ -263,7 +271,10 @@ export function ChannelsPanel({ tenantId }: { tenantId: string }) {
                   <input
                     name="accessToken"
                     type="password"
-                    autoComplete="off"
+                    autoComplete="new-password"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    placeholder="Pegá el token de acceso generado en Meta"
                     minLength={20}
                     maxLength={4096}
                     required

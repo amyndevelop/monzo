@@ -1,6 +1,6 @@
 # Fase 3 · WhatsApp Cloud API y bandeja
 
-Estado: desarrollada y validada localmente en `feat/phase-3-whatsapp-inbox`. El usuario confirmó la migración de producción; publicación del código en preparación y conexión real de MONZO a Meta todavía pendiente. La Fase 2 publicada sigue funcionando en `https://monzo-v.vercel.app`.
+Estado: código integrado y subido a `main` en `a3083f9`, después de confirmar la migración de producción. El usuario mostró la nueva pantalla privada de Canales funcionando en `https://monzo-v.vercel.app/dashboard/canales`. La configuración del webhook y el recorrido real de mensajes desde/hacia MONZO siguen pendientes.
 
 ## Ruta sin servidor permanente · Vercel + QStash
 

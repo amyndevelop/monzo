@@ -121,3 +121,11 @@ El usuario informó un bloque SQL incompleto y luego una referencia a WhatsappAc
 El usuario ejecutó el bloque compacto completo en monzo-db/main/neondb. Su captura muestra DO ejecutado correctamente y dos consultas; luego pegó el resultado **neondb | 7 | 4 | 2**: siete tablas WhatsApp, cuatro migraciones aplicadas y ambas columnas de publicación en cola. No hay transacción pendiente visible en la captura. No se usaron credenciales de producción desde este entorno.
 
 Se prepara la integración/publicación en main para activar el despliegue automático de Vercel. Todavía no se afirma despliegue Ready, webhook de Meta configurado ni entrega real desde MONZO. Se conserva el presupuesto gratuito y la modalidad QStash.
+
+## Código publicado · Canales visible en producción
+
+La entrega se integró y subió a main en el commit `a3083f9`; el push y su SHA remoto fueron comprobados. Los 60 archivos de la entrega se contrastaron con los secretos locales y no incluyeron sus valores, archivos .env ni resultados de pruebas. Después el usuario mostró la nueva pantalla privada de Canales bajo su empresa en el dominio de producción. Eso confirma la pantalla nueva desplegada, aunque no se consultó el estado Ready directamente en el panel de Vercel ni se verificó todavía recepción/envío real con Meta/QStash.
+
+La captura muestra un correo en el campo de ID empresarial y un valor oculto en el token, compatibles con autocompletado del navegador. Se ajustaron las indicaciones y atributos de autocompletado del formulario de credenciales para reducir la confusión con un login. El token continúa oculto y el servidor sigue exigiendo IDs numéricos y autorización real de Meta. El usuario debe sustituir los datos autocompletados por los identificadores y el token de Meta. Próximo paso externo: callback y suscripción messages, luego autorizar el número de prueba y validar ambos sentidos.
+
+El ajuste del formulario pasó lint y compilación de producción, incluida la comprobación TypeScript. La validación con el perfil de Chrome del usuario y su gestor de credenciales sigue siendo una comprobación externa; los atributos reducen el autocompletado y no garantizan el comportamiento de todas las extensiones.
