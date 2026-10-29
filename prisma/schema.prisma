@@ -1,0 +1,50 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+enum MembershipRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+model User {
+  id          String       @id @default(cuid())
+  email       String       @unique
+  name        String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  memberships Membership[]
+}
+model Tenant {
+  id          String          @id @default(cuid())
+  name        String
+  slug        String          @unique
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  memberships Membership[]
+  settings    TenantSettings?
+}
+model Membership {
+  id        String         @id @default(cuid())
+  userId    String
+  tenantId  String
+  role      MembershipRole @default(MEMBER)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  user      User           @relation(fields: [userId], references: [id], onDelete: Restrict)
+  tenant    Tenant         @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  @@unique([tenantId, userId])
+  @@index([userId])
+}
+model TenantSettings {
+  id        String   @id @default(cuid())
+  tenantId  String   @unique
+  timezone  String   @default("America/Argentina/Buenos_Aires")
+  locale    String   @default("es-AR")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+}
