@@ -1,32 +1,42 @@
 generator client {
   provider = "prisma-client-js"
 }
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
 enum MembershipRole {
   OWNER
   ADMIN
   MEMBER
 }
+
 model User {
-  id          String       @id @default(cuid())
-  email       String       @unique
-  name        String?
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  memberships Membership[]
+  id            String       @id @default(cuid())
+  email         String       @unique
+  name          String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  memberships   Membership[]
+  emailVerified Boolean      @default(false)
+  image         String?
+  sessions      Session[]
+  accounts      Account[]
 }
+
 model Tenant {
-  id          String          @id @default(cuid())
+  id          String             @id @default(cuid())
   name        String
-  slug        String          @unique
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  slug        String             @unique
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
   memberships Membership[]
   settings    TenantSettings?
+  invitations TenantInvitation[]
 }
+
 model Membership {
   id        String         @id @default(cuid())
   userId    String
@@ -36,9 +46,11 @@ model Membership {
   updatedAt DateTime       @updatedAt
   user      User           @relation(fields: [userId], references: [id], onDelete: Restrict)
   tenant    Tenant         @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
   @@unique([tenantId, userId])
   @@index([userId])
 }
+
 model TenantSettings {
   id        String   @id @default(cuid())
   tenantId  String   @unique
@@ -47,4 +59,70 @@ model TenantSettings {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@unique([providerId, accountId])
+  @@index([userId])
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+}
+
+model RateLimit {
+  id          String @id @default(cuid())
+  key         String @unique
+  count       Int
+  lastRequest BigInt
+}
+
+model TenantInvitation {
+  id        String         @id @default(cuid())
+  tenantId  String
+  tenant    Tenant         @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  email     String
+  role      MembershipRole @default(MEMBER)
+  tokenHash String         @unique
+  expiresAt DateTime
+  createdAt DateTime       @default(now())
+
+  @@unique([tenantId, email])
+  @@index([expiresAt])
 }

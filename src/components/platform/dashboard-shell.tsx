@@ -35,7 +35,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
   const [open, setOpen] = useState(false);
   const [companyOpen, setCompanyOpen] = useState(false);
-  const title = platformSections.find((s) => path === `/dashboard/${s.slug}`)?.label ?? 'Inicio';
+  const title = platformSections.find((s) => path === `/demo/${s.slug}`)?.label ?? 'Inicio';
   return (
     <div className="dashboard-layout">
       {open && (
@@ -84,9 +84,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         <p className="nav-label">TU ESPACIO DE TRABAJO</p>
         <nav aria-label="Navegación del dashboard">
           <Link
-            className={`dashboard-nav-item ${path === '/dashboard' ? 'active' : ''}`}
-            href="/dashboard"
-            aria-current={path === '/dashboard' ? 'page' : undefined}
+            className={`dashboard-nav-item ${path === '/demo' ? 'active' : ''}`}
+            href="/demo"
+            aria-current={path === '/demo' ? 'page' : undefined}
             onClick={() => setOpen(false)}
           >
             <House size={19} />
@@ -94,12 +94,12 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           </Link>
           {platformSections.map((s) => {
             const Icon = icons[s.icon];
-            const active = path === `/dashboard/${s.slug}`;
+            const active = path === `/demo/${s.slug}`;
             return (
               <Link
                 key={s.slug}
                 className={`dashboard-nav-item ${active ? 'active' : ''}`}
-                href={`/dashboard/${s.slug}`}
+                href={`/demo/${s.slug}`}
                 aria-current={active ? 'page' : undefined}
                 onClick={() => setOpen(false)}
               >

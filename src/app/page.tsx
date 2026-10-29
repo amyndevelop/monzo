@@ -290,7 +290,7 @@ export default function Home() {
             <span>
               <Check size={18} /> Ya podés recorrer la base visual del producto.
             </span>
-            <Link href="/dashboard">
+            <Link href="/demo">
               Explorar el dashboard de demostración <ArrowRight size={17} />
             </Link>
           </div>
@@ -309,7 +309,7 @@ export default function Home() {
                 <br className="desktop-break" /> y explorá lo que estamos construyendo.
               </p>
               <Button asChild size="lg">
-                <Link href="/dashboard">
+                <Link href="/demo">
                   Conocer el producto <ArrowUpRight size={18} />
                 </Link>
               </Button>
@@ -334,7 +334,7 @@ export default function Home() {
           <nav aria-label="Pie de página">
             <Link href="#beneficios">Por qué MONZO</Link>
             <Link href="#funcionalidades">Funcionalidades</Link>
-            <Link href="/dashboard">
+            <Link href="/demo">
               Explorar demo <ArrowUpRight size={14} />
             </Link>
           </nav>

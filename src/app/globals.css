@@ -1898,3 +1898,479 @@ svg {
     transition: none !important;
   }
 }
+/* Accounts and verified company workspaces */
+.auth-page {
+  max-width: 1200px;
+  margin: auto;
+  padding: 32px 40px;
+  min-height: 100dvh;
+}
+.auth-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.auth-top > a:last-child {
+  font-size: 12px;
+  color: var(--secondary);
+}
+.auth-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 90px;
+  align-items: center;
+  padding-block: 65px;
+}
+.auth-story h1 {
+  font-size: 43px;
+  font-weight: 650;
+  line-height: 1.16;
+  margin-top: 20px;
+}
+.auth-story > p:not(.eyebrow) {
+  color: var(--muted-foreground);
+  font-size: 14px;
+  margin-top: 20px;
+}
+.auth-story > img {
+  width: 235px;
+  height: auto;
+  margin: 24px auto;
+}
+.auth-story > span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--secondary);
+  font-size: 11px;
+}
+.auth-card {
+  background: white;
+  padding: 38px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  box-shadow: var(--shadow-soft);
+}
+.auth-card h2 {
+  font-size: 29px;
+  margin-top: 15px;
+}
+.auth-description {
+  font-size: 13px;
+  color: var(--muted-foreground);
+  margin-top: 15px;
+  margin-bottom: 25px;
+}
+.account-form {
+  display: grid;
+  gap: 20px;
+}
+.account-form label {
+  display: grid;
+  gap: 8px;
+  color: var(--foreground);
+  font-size: 12px;
+  font-weight: 550;
+}
+.account-form input,
+.account-form select,
+.member-controls select {
+  width: 100%;
+  background: white;
+  border: 1px solid #ccdbe0;
+  border-radius: 9px;
+  padding: 12px 13px;
+  color: var(--foreground);
+  font: inherit;
+  font-size: 14px;
+  min-width: 0;
+}
+.account-form input:focus,
+.account-form select:focus,
+.live-workspace-switch select:focus,
+.member-controls select:focus {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.account-form input:disabled,
+.account-form select:disabled {
+  background: #f3f7f8;
+  color: #6e7e8d;
+}
+.account-form small {
+  color: var(--muted-foreground);
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 1.7;
+}
+.account-form [data-slot='button'] {
+  width: 100%;
+}
+.form-error,
+.form-message {
+  border-radius: 10px;
+  padding: 14px;
+  font-size: 12px;
+  line-height: 1.8;
+  margin-block: 16px;
+}
+.form-error {
+  color: #a13232;
+  background: #fff0f0;
+  border: 1px solid #efd1d1;
+}
+.form-message {
+  color: #286b67;
+  background: #eaf8f5;
+  border: 1px solid #cde9e2;
+}
+.form-message a {
+  color: var(--secondary);
+  font-weight: 600;
+}
+.auth-links {
+  display: grid;
+  gap: 15px;
+  text-align: center;
+  margin-top: 24px;
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+.auth-links a {
+  color: var(--secondary);
+  font-weight: 550;
+}
+.auth-success {
+  display: grid;
+  gap: 22px;
+  font-size: 13px;
+  color: var(--secondary);
+}
+.auth-footer {
+  text-align: center;
+  color: var(--muted-foreground);
+  font-size: 10px;
+}
+.workspaces-page {
+  max-width: 1100px;
+  padding-block: 32px 70px;
+}
+.workspaces-page > header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.workspaces-title {
+  margin-top: 65px;
+  margin-bottom: 35px;
+}
+.workspaces-title h1 {
+  font-size: 37px;
+  font-weight: 650;
+  line-height: 1.2;
+  margin-top: 15px;
+}
+.workspaces-title > p:last-child {
+  color: var(--muted-foreground);
+  margin-top: 15px;
+  font-size: 14px;
+}
+.workspace-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+.workspace-card {
+  display: flex;
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: 15px;
+  background: white;
+  padding: 24px;
+  text-align: left;
+  transition: border-color 0.2s;
+}
+.workspace-card:hover {
+  border-color: var(--primary);
+}
+.workspace-card strong {
+  font-size: 18px;
+  overflow-wrap: anywhere;
+}
+.workspace-card small {
+  color: var(--muted-foreground);
+  font-size: 11px;
+}
+.workspace-card > span:last-child {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  color: var(--secondary);
+  font-size: 12px;
+  margin-top: 6px;
+}
+.empty-workspaces {
+  background: #edf7f6;
+  border: 1px solid #d6e9e6;
+  border-radius: 16px;
+  padding: 35px;
+  color: var(--secondary);
+}
+.empty-workspaces h2 {
+  font-size: 24px;
+  margin-top: 17px;
+}
+.empty-workspaces p {
+  font-size: 13px;
+  margin-top: 10px;
+}
+.create-workspace {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 45px;
+  border-top: 1px solid var(--border);
+  margin-top: 40px;
+  padding-top: 35px;
+}
+.create-workspace h2 {
+  font-size: 27px;
+  margin-top: 12px;
+}
+.create-workspace p:not(.eyebrow) {
+  color: var(--muted-foreground);
+  font-size: 12px;
+  margin-top: 14px;
+}
+.live-workspace-switch {
+  display: grid;
+  gap: 9px;
+}
+.live-workspace-switch label {
+  color: var(--muted-foreground);
+  font-size: 10px;
+  padding-left: 5px;
+}
+.live-workspace-switch select {
+  width: 100%;
+  min-width: 0;
+  padding: 12px 10px;
+  background: #edf7f7;
+  border: 1px solid #cee5e5;
+  border-radius: 9px;
+  font-size: 12px;
+  color: var(--secondary);
+}
+.live-workspace-switch p {
+  color: #a13232;
+  font-size: 10px;
+}
+.session-indicator {
+  color: var(--secondary);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+}
+.workspace-shortcuts {
+  margin-top: 24px;
+}
+.settings-form {
+  max-width: 650px;
+  padding: 30px;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+}
+.team-list {
+  border: 1px solid var(--border);
+  border-radius: 15px;
+  background: white;
+  overflow: hidden;
+}
+.member-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px;
+}
+.member-row + .member-row {
+  border-top: 1px solid var(--border);
+}
+.member-row strong {
+  font-size: 14px;
+}
+.member-row p {
+  font-size: 11px;
+  color: var(--muted-foreground);
+  overflow-wrap: anywhere;
+}
+.member-row > div:first-child {
+  min-width: 0;
+}
+.member-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.member-controls select {
+  width: 150px;
+  font-size: 11px;
+  padding: 9px;
+}
+.member-controls [data-slot='button'] {
+  color: #9b3a3a;
+  font-size: 10px;
+  padding-inline: 12px;
+}
+.invite-card {
+  margin-top: 25px;
+  padding: 30px;
+  border: 1px solid var(--border);
+  border-radius: 15px;
+  background: white;
+  max-width: 650px;
+}
+.invite-card h2 {
+  font-size: 24px;
+}
+.invite-card > p {
+  margin-top: 12px;
+  margin-bottom: 24px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.invitation-page {
+  max-width: 650px;
+  padding: 50px 25px;
+  margin: auto;
+  display: grid;
+  justify-items: start;
+  gap: 24px;
+}
+.invitation-page h1 {
+  font-size: 36px;
+  font-weight: 650;
+  line-height: 1.2;
+}
+.invitation-page > p {
+  color: var(--muted-foreground);
+  font-size: 14px;
+}
+.spin {
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (max-width: 900px) {
+  .auth-grid {
+    gap: 35px;
+  }
+  .auth-story h1 {
+    font-size: 34px;
+  }
+  .auth-card {
+    padding: 28px;
+  }
+  .workspace-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .member-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .member-controls {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+@media (max-width: 600px) {
+  .auth-page {
+    padding: 23px 20px;
+  }
+  .auth-grid {
+    grid-template-columns: 1fr;
+    padding-block: 35px;
+    gap: 25px;
+  }
+  .auth-story h1 {
+    font-size: 31px;
+  }
+  .auth-story > img,
+  .auth-story > span {
+    display: none;
+  }
+  .auth-story > p:not(.eyebrow) {
+    font-size: 12px;
+    margin-top: 14px;
+  }
+  .auth-card {
+    padding: 25px 22px;
+  }
+  .auth-card h2 {
+    font-size: 26px;
+  }
+  .auth-description {
+    font-size: 12px;
+  }
+  .workspaces-title {
+    margin-top: 40px;
+  }
+  .workspaces-title h1 {
+    font-size: 29px;
+  }
+  .workspaces-title > p:last-child {
+    font-size: 12px;
+  }
+  .workspace-grid {
+    grid-template-columns: 1fr;
+  }
+  .create-workspace {
+    grid-template-columns: 1fr;
+    gap: 25px;
+  }
+  .empty-workspaces {
+    padding: 25px;
+  }
+  .empty-workspaces h2 {
+    font-size: 22px;
+  }
+  .settings-form,
+  .invite-card {
+    padding: 24px 20px;
+  }
+  .session-indicator {
+    font-size: 8px;
+  }
+  .dashboard-header .sign-out {
+    font-size: 10px;
+  }
+  .member-row {
+    padding: 20px;
+  }
+  .member-controls select {
+    width: 145px;
+  }
+  .dashboard-page-title h1 {
+    overflow-wrap: anywhere;
+  }
+  .private-heading {
+    min-width: 0;
+  }
+  .invitation-page h1 {
+    font-size: 30px;
+  }
+}
+.dashboard-heading {
+  min-width: 0;
+}
+.dashboard-heading strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

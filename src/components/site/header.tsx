@@ -16,8 +16,8 @@ export function SiteHeader() {
           <Link href="#funcionalidades">Funcionalidades</Link>
         </nav>
         <div className="header-actions">
-          <Link className="quiet-link desktop-nav" href="/dashboard">
-            Explorar demo
+          <Link className="quiet-link desktop-nav" href="/ingresar">
+            Ingresar
           </Link>
           <Button asChild>
             <Link href="#conocer">
@@ -47,7 +47,8 @@ export function SiteHeader() {
           <Link href="#beneficios">Por qué MONZO</Link>
           <Link href="#como-funciona">Cómo funciona</Link>
           <Link href="#funcionalidades">Funcionalidades</Link>
-          <Link href="/dashboard">Explorar demo</Link>
+          <Link href="/demo">Explorar demo</Link>
+          <Link href="/ingresar">Ingresar a mi cuenta</Link>
         </nav>
       )}
     </header>

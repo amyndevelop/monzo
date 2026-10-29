@@ -1,121 +1,61 @@
 import Link from 'next/link';
-import {
-  ArrowRight,
-  ArrowUpRight,
-  Check,
-  CircleDashed,
-  MessagesSquare,
-  ShieldCheck,
-  Sparkles,
-} from 'lucide-react';
+import { ArrowRight, Building2, Users, Settings2 } from 'lucide-react';
 import { Mascot } from '@/components/brand/mascot';
 import { Button } from '@/components/ui/button';
-export default function Dashboard() {
+import { requireDashboardContext } from '@/modules/access/policy';
+export default async function Dashboard() {
+  const { tenant } = await requireDashboardContext();
   return (
     <>
       <div className="dashboard-page-title">
         <div>
-          <p className="eyebrow">TU PRÓXIMO GRAN ALIADO</p>
+          <p className="eyebrow">TU ESPACIO YA ESTÁ LISTO</p>
           <h1>
-            Hola, esto es MONZO<span className="turquoise">.</span>
+            {tenant.name}
+            <span className="turquoise">.</span>
           </h1>
-          <p>Un primer vistazo al lugar donde tus conversaciones van a crecer.</p>
+          <p>Tu cuenta está verificada y este espacio pertenece a tu empresa.</p>
         </div>
-        <span className="small-badge">Vista de demostración</span>
       </div>
       <section className="dashboard-welcome">
         <div>
           <span className="availability">
-            <Sparkles size={15} /> Un espacio lleno de posibilidades
+            <Building2 size={16} /> Un espacio independiente
           </span>
           <h2>
-            Tu negocio, conectado.
+            Tu equipo tiene
             <br />
-            Tu equipo, acompañado.
+            un lugar para conectar.
           </h2>
           <p>
-            Estamos preparando una forma más simple de atender,
-            <br className="desktop-break" /> automatizar y construir relaciones con tus clientes.
+            Administrá las personas y preferencias de tu empresa.
+            <br />
+            Los canales, agentes y automatizaciones llegarán en próximas fases.
           </p>
           <Button asChild>
-            <Link href="/dashboard/agentes-ia">
-              Descubrir lo que viene <ArrowRight size={17} />
+            <Link href="/dashboard/equipo">
+              Ver mi equipo <ArrowRight size={17} />
             </Link>
           </Button>
         </div>
-        <Mascot reaction="support" size={300} priority />
+        <Mascot reaction="welcome" size={250} priority />
       </section>
-      <div className="dashboard-section-title">
-        <h2>Todo empieza con una conexión</h2>
-        <span>Disponibles en próximas fases</span>
-      </div>
-      <div className="dashboard-quick-grid">
-        {[
-          {
-            icon: MessagesSquare,
-            title: 'Conversaciones',
-            text: 'Toda tu atención, en un mismo lugar.',
-            href: 'conversaciones',
-          },
-          {
-            icon: Sparkles,
-            title: 'Agentes IA',
-            text: 'Inteligencia que entiende tu negocio.',
-            href: 'agentes-ia',
-          },
-          {
-            icon: ShieldCheck,
-            title: 'Equipo y acceso',
-            text: 'Personas conectadas, con control.',
-            href: 'equipo',
-          },
-        ].map(({ icon: Icon, title, text, href }) => (
-          <Link key={title} href={`/dashboard/${href}`} className="dashboard-quick-card">
-            <div>
-              <span className="icon-tile">
-                <Icon size={23} />
-              </span>
-              <ArrowUpRight size={18} />
-            </div>
-            <h3>{title}</h3>
-            <p>{text}</p>
-            <span className="small-badge">Próximamente</span>
-          </Link>
-        ))}
-      </div>
-      <div className="dashboard-lower">
-        <section className="phase-card">
-          <p className="eyebrow">PASO A PASO, CON PROPÓSITO</p>
-          <h2>Así va tomando forma MONZO</h2>
-          <div className="phase-row">
-            <span className="phase-check">
-              <Check size={16} />
-            </span>
-            <div>
-              <strong>Fase 1 · Fundación visual y técnica</strong>
-              <p>Landing, navegación y estructura del producto.</p>
-            </div>
-            <span className="small-badge">Estás acá</span>
-          </div>
-          <div className="phase-row">
-            <CircleDashed size={23} />
-            <div>
-              <strong>Fase 2 · Autenticación y multiempresa</strong>
-              <p>Identidad, membresías y aislamiento de datos.</p>
-            </div>
-          </div>
-        </section>
-        <section className="honesty-card">
-          <ShieldCheck size={26} />
-          <h3>La confianza empieza por la claridad.</h3>
-          <p>
-            No mostramos métricas inventadas. Cuando conectes tu negocio en una próxima fase, este
-            espacio reflejará tu actividad real.
-          </p>
-          <Link href="/">
-            Conocer la visión <ArrowRight size={16} />
-          </Link>
-        </section>
+      <div className="dashboard-quick-grid workspace-shortcuts">
+        <Link href="/dashboard/equipo" className="dashboard-quick-card">
+          <Users className="turquoise" />
+          <h3>Equipo y permisos</h3>
+          <p>Personas con acceso a esta empresa.</p>
+        </Link>
+        <Link href="/dashboard/configuracion" className="dashboard-quick-card">
+          <Settings2 className="turquoise" />
+          <h3>Preferencias de empresa</h3>
+          <p>Nombre, idioma y zona horaria.</p>
+        </Link>
+        <Link href="/empresas" className="dashboard-quick-card">
+          <Building2 className="turquoise" />
+          <h3>Mis empresas</h3>
+          <p>Cambiá de espacio o creá uno nuevo.</p>
+        </Link>
       </div>
     </>
   );

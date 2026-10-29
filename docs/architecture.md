@@ -1,38 +1,41 @@
-# Arquitectura · Fundación
+# Arquitectura · Fase 2
 
-## Decisiones
+Monolito modular Next.js App Router, TypeScript estricto, Prisma 6.19.3 y PostgreSQL 17. React Server Components para obtener datos autorizados y componentes cliente para formularios y navegación. Inter se sirve localmente. Tailwind 4, shadcn/ui y Lucide conservan la identidad Cloud.
 
-Monolito modular con Next.js App Router, TypeScript estricto y React Server Components por defecto. Los únicos componentes cliente gestionan navegación, menú responsive y el selector informativo de empresa. Las rutas actuales son estáticas; no leen datos privados ni crean sesiones. Fuente Inter alojada localmente con `@fontsource-variable/inter`, sin dependencia de Google Fonts en runtime o build.
+## Rutas y límites
 
-Tailwind CSS 4 procesa estilos y tokens. `components.json`, `cn()` y `Button` siguen la arquitectura de shadcn/ui (Radix Slot, CVA, Tailwind Merge). Los componentes son código local extensible; no se instaló un kit administrativo. Lucide provee los iconos de interfaz, no reemplazos del branding.
+El sitio y `/demo` son públicos. Las cuentas viven en rutas de acceso explícitas. `/empresas`, `/dashboard` y las APIs de empresa requieren sesión y correo verificado. El layout privado ayuda a la navegación, pero no es el límite de seguridad: cada página que obtiene datos y cada endpoint vuelven a autorizar la operación en el servidor.
 
-Prisma 6.19.3 y `@prisma/client` usan la misma versión estable de la línea 6, evitando versiones preliminares de Prisma 8. Next.js 16.4.3 y React 19.3.1 fueron consultados en npm e instalados con lockfile. `npm ci` reproduce las versiones resueltas. Node está fijado en `.nvmrc`.
+`src/modules/auth` integra Better Auth 1.7.14 con el adaptador Prisma y transacciones habilitadas. La instancia se inicializa de forma diferida; `isAuthConfigured` permite mostrar un estado de preparación si faltan requisitos, sin crear sesiones falsas. La biblioteca gestiona contraseñas, cookies, tokens de correo y sesiones persistentes. SMTP usa Nodemailer con TLS obligatorio fuera de desarrollo local; Mailpit captura los mensajes de las pruebas.
 
-## Límites de módulos
+`src/modules/access` valida sesiones contra la base sin cookie cache. La cookie de empresa solamente identifica una selección. No se acepta un `userId` enviado por el cliente ni un rol de un formulario para decidir permisos.
 
-| Área                         | Implementado en Fase 1                  | Evolución prevista                              |
-| ---------------------------- | --------------------------------------- | ----------------------------------------------- |
-| Sitio                        | Landing, anclas y navegación responsive | Contenido comercial verificado                  |
-| Plataforma                   | Shell y estados próximos públicos       | Rutas operativas protegidas                     |
-| Acceso                       | Denegación de cualquier operación       | Identidad verificada en servidor y autorización |
-| Empresas                     | Esquema Tenant/Membership/Settings      | Contexto autorizado por solicitud               |
-| IA, canales, CRM, analíticas | Presentación de capacidades futuras     | Módulos independientes dentro del monolito      |
-| Procesos asíncronos          | Diseño documentado                      | Worker Node independiente con Redis/BullMQ      |
+`src/modules/tenants` encapsula todas las consultas de empresa y usa Prisma solo servidor. GET requiere identidad y membresía. Mutaciones JSON requieren además el origen exacto, contenido acotado y validación de campos; no aceptan roles de creación de empresa del cliente. Al crearla se asigna OWNER en una transacción.
 
-El worker no está creado ni ejecutándose. Las tareas largas de Meta/IA no deberán depender de la vida de un request de Vercel; se enviarán a colas, con idempotencia, retries limitados y límites por tenant. Redis, BullMQ, OpenAI y Meta no se instalaron porque no se usan en esta fase. El despliegue de frontend/endpoints compatibles en Vercel y worker en VPS pertenece a fases posteriores.
+## Modelo
 
-## Modelo de datos
+- User y Account: identidad y credencial de Better Auth; sin contraseña en User.
+- Session: sesión persistente, vencimiento y token de Better Auth. No se devuelve la tabla en DTOs de la UI.
+- Verification: tokens temporales de la biblioteca para recuperación.
+- RateLimit: límites de autenticación compartidos en PostgreSQL.
+- Tenant y TenantSettings: identidad y preferencias de cada empresa.
+- Membership: vínculo único tenant/usuario con OWNER, ADMIN o MEMBER.
+- TenantInvitation: destinatario, rol, expiración y hash del token; relación obligatoria con empresa.
 
-`User` representa identidad global, con email único. `Tenant` representa empresa, con slug único. `Membership` vincula usuario y empresa con una única pareja `(tenantId, userId)` y rol OWNER/ADMIN/MEMBER; el rol por defecto es MEMBER. Tiene índice de búsqueda por usuario. `TenantSettings` es una relación opcional uno a uno; no se crea automáticamente. Fechas de creación y actualización soportan trazabilidad básica. Las relaciones usan `Restrict`, sin borrados en cascada.
+Las relaciones del dominio conservan `Restrict`: no hay eliminación de empresas ni borrados en cascada de datos de clientes. Sesiones/cuentas usan cascada sobre su usuario, pero no se habilitó la eliminación pública de usuarios. La migración inicial reproduce el esquema de Fase 1; la segunda agrega autenticación e invitaciones sin drops o resets.
 
-No hay contraseñas, semillas ni tenant por defecto. No se ejecutaron migraciones. El esquema no sustituye autorización. En Fase 2, cada operación deberá verificar sesión y membresía en servidor, derivar `tenantId` del contexto autorizado y filtrar cada consulta. Nunca confiar solamente en el selector visual, cookies sin verificar, IDs del cliente o un rol recibido por request. Probar acceso cruzado, revocación de membresía y elevación de privilegios antes de habilitar datos reales. Evaluar RLS como defensa adicional.
+## Concurrencia y revocación
 
-## Seguridad y límites actuales
+Cambios de preferencias y membresías bloquean la fila de la empresa dentro de una transacción y revalidan el rol después de obtener el bloqueo. La eliminación/democión de propietarios cuenta los OWNER dentro de ese mismo bloqueo: dos solicitudes concurrentes no pueden dejar a la empresa sin propietario.
 
-La demo es deliberadamente pública y no representa una sesión. No existe login falso, almacenamiento de credenciales ni endpoints que modifiquen datos. `src/modules/access/policy.ts` falla de forma cerrada y `src/lib/db.ts` está restringido al servidor, con inicialización diferida. No se hacen consultas Prisma en las páginas públicas.
+Las invitaciones se aceptan una sola vez, con sesión verificada del email destinatario. El token de 32 bytes aleatorios solo se almacena como SHA-256. Una membresía existente no se eleva automáticamente al aceptar una invitación. La cookie activa se revalida en cada lectura: revocar una membresía invalida el acceso en la próxima solicitud.
 
-Cabeceras `nosniff`, `DENY`, política de referer y permisos de cámara/micrófono/geolocalización restringidos. Metadatos de la demo excluyen indexación; esto no es un control de acceso. La autenticación completa, protección de acciones, controles de abuso, CSP ajustada al despliegue y pruebas de aislamiento siguen pendientes. No se afirma cumplimiento normativo ni seguridad multiempresa completa.
+El cliente hace una navegación de documento completa después de login, logout, aceptación de invitación o cambio de empresa para descartar el cache del router de la identidad/empresa anterior. La autorización sigue estando en el servidor.
+
+## Worker e integraciones futuras
+
+El worker Node independiente con Redis/BullMQ sigue pendiente. Las futuras tareas largas se encolarán con idempotencia y límites por tenant, sin depender de la vida de un request Vercel. No se incorporaron OpenAI, Meta, conversaciones operativas, CRM, pagos o métricas reales. No se crearon microservicios.
 
 ## Entornos
 
-Desarrollo: `.env` local ignorado y ejemplo explícito de PostgreSQL local. Pruebas actuales: navegador contra build de producción, sin base ni APIs. Futuras pruebas de integración: base aislada `monzo_test`, nunca producción. Producción: secretos gestionados por el proveedor y migraciones revisadas; no configurada ni desplegada.
+Compose sirve únicamente para desarrollo y pruebas locales, con volúmenes y puertos separados. El runner restringe la base de pruebas a la instancia local monzo_test en el puerto 55433. En Vercel se requieren PostgreSQL gestionado, SMTP y secretos propios de cada entorno. La autenticación nunca usa una contraseña de muestra como sustituto de configuración faltante. La rama de desarrollo no se envía a `main` automáticamente.

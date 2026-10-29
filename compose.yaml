@@ -1,0 +1,33 @@
+services:
+  database:
+    image: postgres:17-alpine@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b
+    environment:
+      POSTGRES_USER: monzo
+      POSTGRES_PASSWORD: ${MONZO_DEV_DB_PASSWORD:?Run npm run setup:local first}
+      POSTGRES_DB: monzo_dev
+    ports: ['127.0.0.1:5432:5432']
+    volumes: ['monzo_dev_data:/var/lib/postgresql/data']
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U monzo -d monzo_dev']
+      interval: 2s
+      timeout: 3s
+      retries: 20
+  test-database:
+    image: postgres:17-alpine@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b
+    environment:
+      POSTGRES_USER: monzo
+      POSTGRES_PASSWORD: ${MONZO_TEST_DB_PASSWORD:?Run npm run setup:local first}
+      POSTGRES_DB: monzo_test
+    ports: ['127.0.0.1:55433:5432']
+    volumes: ['monzo_test_data:/var/lib/postgresql/data']
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U monzo -d monzo_test']
+      interval: 2s
+      timeout: 3s
+      retries: 20
+  mail:
+    image: axllent/mailpit@sha256:0790692be935ea4420d085694f7985b1f692ca6a8771ab0e0bd8ba75ac180498
+    ports: ['127.0.0.1:1025:1025', '127.0.0.1:8025:8025']
+volumes:
+  monzo_dev_data:
+  monzo_test_data:
