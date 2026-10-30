@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { createHash, createHmac, randomUUID } from 'node:crypto';
 import { fixture, db, inbound, deliver } from './helpers/whatsapp';
 import { captureWebhook } from '../src/modules/whatsapp/core/ingest';
+import { type MetaFetch } from '../src/modules/whatsapp/core/meta';
 import {
   callbackUrl,
   dispatchJobs,
@@ -241,6 +242,39 @@ test('envío guardado puede reintentarse con la misma clave; callbacks concurren
     if (token === undefined) delete process.env.QSTASH_TOKEN;
     else process.env.QSTASH_TOKEN = token;
   }
+  await f.api.dispose();
+});
+
+test('QStash: destinatario argentino alternativo conserva el contacto y callbacks repetidos no reenvían', async () => {
+  const f = await fixture();
+  const conv = await received(f);
+  const { saved } = await saveOutbound(f, conv.id);
+  const recipients: string[] = [];
+  const transport: MetaFetch = async (_, init) => {
+    const body = JSON.parse(init.body!);
+    recipients.push(body.to);
+    expect(body.biz_opaque_callback_data).toBe(saved.id);
+    return body.to === '5491112345678'
+      ? { ok: false, status: 400, json: async () => ({ error: { code: 131030 } }) }
+      : {
+          ok: true,
+          status: 200,
+          json: async () => ({ messages: [{ id: 'wamid.argentina.' + saved.id }] }),
+        };
+  };
+  const job: WhatsappJob = { kind: 'outbox', id: saved.id };
+  await Promise.all([processJob(db, job, transport), processJob(db, job, transport)]);
+  await processJob(db, job, transport);
+  expect(recipients).toEqual(['5491112345678', '541112345678']);
+  expect(await db.message.findUniqueOrThrow({ where: { id: saved.id } })).toMatchObject({
+    status: 'SENT',
+    providerId: 'wamid.argentina.' + saved.id,
+    errorCode: null,
+  });
+  expect(await db.contact.findUniqueOrThrow({ where: { id: conv.contactId } })).toMatchObject({
+    waId: '5491112345678',
+  });
+  expect(await db.contact.count({ where: { accountId: f.account.id } })).toBe(1);
   await f.api.dispose();
 });
 

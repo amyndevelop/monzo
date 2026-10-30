@@ -1,6 +1,6 @@
 # Progreso de MONZO
 
-Fecha: 29 de octubre de 2026.
+Fecha: 30 de octubre de 2026.
 
 ## Fase 1 · Publicada
 
@@ -141,3 +141,11 @@ Se añadió diagnóstico en Canales que comunica al OWNER solamente nombres de v
 También se normalizan espacios y un par de comillas exteriores en la URL pública de QStash, para admitir valores copiados desde ejemplos .env. Se mantienen HTTPS, host oficial, ruta base, ausencia de credenciales/redirecciones y validación TLS. No se modifican tokens ni claves. La prueba del contrato verifica la región US entre comillas y sigue rechazando una ruta /v2/publish o un host ajeno.
 
 El usuario confirmó haber actualizado todas las variables sin comillas. El siguiente despliegue debe tomar esos valores; no se verificaron directamente. El ajuste pasó lint, compilación con TypeScript y los 16 casos de QStash (incluido diagnóstico privado y URL US normalizada). Después del despliegue, confirmar que se habilitó el procesamiento, recuperar pendientes y probar recepción/respuesta reales. No volver a autorizar o desconectar el número si la autorización actual sigue válida.
+
+## Recepción real confirmada · Variante argentina del destinatario de prueba
+
+Después del ajuste de QStash `99d7025`, el usuario confirmó mensajes reales visibles en la bandeja de MONZO. El primer envío falló con META_190 y, tras renovar el token temporal, con META_131030. La plantilla enviada desde la consola de Meta sí llegó al mismo teléfono. El usuario y su captura confirman que el destinatario autorizado por Meta usa `54` + número nacional, mientras MONZO recibe el WA ID argentino `549` + ese número. No se almacenaron en estos documentos el teléfono real ni el token visible en la captura. Se indicó renovar esa credencial y sustituirla en Canales.
+
+Se añade una variante de envío limitada a un rechazo explícito 131030 para WA IDs argentinos de trece dígitos: una sola petición adicional con `54` + los diez dígitos nacionales. Se conserva el contacto y la correlación del mensaje. No se reintentan aceptaciones, resultados inciertos, errores de servidor, credenciales u otros destinatarios. El mensaje fallido anterior permanece como tal; la prueba externa debe usar un mensaje nuevo tras desplegar el ajuste. El recorrido saliente real continúa pendiente de confirmación.
+
+Validación del ajuste: lint y compilación de producción con TypeScript aprobados; **28/28 casos** de contratos de Meta y QStash aprobados en escritorio/móvil, con la base local aislada. Incluyen aceptación original, variante después de rechazo, otros países/longitudes, credencial/ventana, timeout, respuesta sin ID, servidor 500, segundo fallo sin tercer envío y callbacks concurrentes/repetidos sin duplicar ni cambiar el contacto. Formato y diff comprobados. No se ejecutaron llamadas de envío reales desde este entorno ni se modificó el esquema de producción.

@@ -94,23 +94,41 @@ export async function sendText(
   callbackId: string,
   transport?: MetaFetch,
 ) {
-  const data = await graphRequest(
-    `${phoneNumberId}/messages`,
-    token,
-    'POST',
-    {
-      messaging_product: 'whatsapp',
-      recipient_type: 'individual',
-      to,
-      type: 'text',
-      text: { preview_url: false, body: text },
-      biz_opaque_callback_data: callbackId,
-    },
-    transport,
-  );
-  const messages = data.messages as { id?: string }[] | undefined;
-  const id = messages?.[0]?.id;
-  if (typeof id !== 'string' || !id.length || id.length > 256)
-    throw new MetaError('RESPONSE_UNKNOWN', true);
-  return id;
+  async function send(recipient: string) {
+    const data = await graphRequest(
+      `${phoneNumberId}/messages`,
+      token,
+      'POST',
+      {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to: recipient,
+        type: 'text',
+        text: { preview_url: false, body: text },
+        biz_opaque_callback_data: callbackId,
+      },
+      transport,
+    );
+    const messages = data.messages as { id?: string }[] | undefined;
+    const id = messages?.[0]?.id;
+    if (typeof id !== 'string' || !id.length || id.length > 256)
+      throw new MetaError('RESPONSE_UNKNOWN', true);
+    return id;
+  }
+  try {
+    return await send(to);
+  } catch (error) {
+    // The test-recipient allowlist can use 54 + national number while the
+    // webhook uses the Argentine mobile WA ID 549 + national number. Try that
+    // equivalent format once, only after an explicit recipient rejection.
+    // Successful or uncertain requests must never be sent again.
+    if (
+      error instanceof MetaError &&
+      error.code === 'META_131030' &&
+      !error.uncertain &&
+      /^549\d{10}$/.test(to)
+    )
+      return send('54' + to.slice(3));
+    throw error;
+  }
 }
