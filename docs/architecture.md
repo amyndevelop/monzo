@@ -65,3 +65,17 @@ Meta conserva el archivo; PostgreSQL guarda ID, MIME, nombre, tamaño y hash. No
 La sexta migración agrega WhatsappTemplate por cuenta/empresa y una instantánea inmutable en Message. La sincronización explícita pagina Graph de a 50, con cursor validado y versión para rechazar escrituras obsoletas. La UI consulta el catálogo local y presenta variables y vista previa en el chat. Los encabezados de archivo reutilizan el transporte privado de adjuntos. No se añade proveedor ni secreto.
 
 El worker consulta estado y definición en Meta antes de reclamar una plantilla. Revalida membresía, cuenta, WABA, versión de credencial y hash bajo bloqueo; entonces usa el transporte de mensajes existente. El bypass de ventana corresponde exclusivamente al tipo template validado; texto/medios mantienen las 24 horas. La instantánea conserva el historial aunque cambie el catálogo. Ver `docs/phase-5.md` para formatos, permisos, límites y actualización previa de Neon.
+
+## Automatizaciones guiadas · Fase 7
+
+AutomationFlow contiene borrador y publicación por número, con revisión optimista y
+versión de ejecución. Conversation guarda pausa humana, generación y sesión. Message
+conserva la instantánea, sourceId único y evento de origen. La recepción crea como
+máximo una respuesta por mensaje bajo bloqueo de tenant; el despacho ocurre después
+del commit y usa la outbox existente. El worker revalida versión, generación, rol,
+cuenta y ventana antes de reclamar el envío. No hay HTTP durante las transacciones.
+
+La intervención humana cancela respuestas automáticas no reclamadas y pausa el
+recorrido. Las conversaciones previas a la migración comienzan pausadas. El editor
+valida un grafo sin ciclos, el simulador es local y publicar no envía mensajes por
+sí mismo. No se usan Gemini ni herramientas externas. Ver docs/phase-7.md.

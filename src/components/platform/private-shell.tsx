@@ -140,6 +140,7 @@ export function PrivateShell({
                   'contactos',
                   'conversaciones',
                   'agentes-ia',
+                  'automatizaciones',
                 ].includes(section.slug) && <span className="nav-soon" aria-label="Próximamente" />}
               </Link>
             ))}

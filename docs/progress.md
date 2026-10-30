@@ -280,3 +280,56 @@ Esta actualización documental activa un nuevo despliegue desde main para que Ve
 aplique las variables actuales. El acceso efectivo al modelo y la cuota gratuita
 se confirmarán con una pregunta ficticia desde el laboratorio autenticado. No se
 considera la presencia declarada de la clave como prueba de respuesta real de Gemini.
+
+## Fase 7 · Árboles guiados y control humano preparados
+
+El usuario autorizó continuar con automatizaciones de consultas/respuestas, editor
+visual y simulador. Rama feat/phase-7-guided-flows: un flujo por número con preguntas
+(botones/listas), respuestas finales y derivación al equipo; borrador separado de
+publicación, revisión optimista, pausa y reactivación. No se usa Gemini ni se modifica
+su facturación. No se activó ningún flujo real ni se enviaron mensajes desde este entorno.
+
+El motor procesa una respuesta por entrante, con sourceId único y deduplicación de
+webhooks. Guarda instantánea, versión y generación, y despacha IDs por la cola actual
+después del commit. El worker vuelve a comprobar permisos, cuenta, ventana, versión
+y control humano. Las respuestas automáticas se identifican en el historial. MENÚ
+reinicia recorridos automáticos, sin levantar una derivación humana. Tres opciones
+no reconocidas derivan al equipo; los límites de seis respuestas por hilo/minuto y
+30 salientes por empresa/minuto pausan para revisión, sin responder en bucle.
+
+Tomar atención, responder con texto/archivo/plantilla, asignar/quitar operador y
+cerrar/reabrir pausan la automatización y cancelan solo sus mensajes QUEUED. Reanudar
+requiere conversación abierta y sin asignación; no envía nada hasta el próximo
+entrante. Las notas y lecturas no la pausan. Una pausa no puede retirar un mensaje
+que ya fue reclamado; la UI lo explica y nunca reintenta resultados inciertos.
+Si el publicador pierde permisos, se informa la necesidad de una nueva publicación.
+
+Octava migración aditiva 202610300004_guided_flows: AutomationFlow y siete columnas
+nuevas entre Conversation y Message, con referencias compuestas e índices. El valor
+inicial de pausa es true: las conversaciones existentes y las creadas por código
+anterior durante el despliegue quedan bajo control humano. El nuevo manejador habilita
+explícitamente solo conversaciones recién recibidas. Generador y prueba de SQL en
+scripts/prepare-phase-7-sql.mjs y scripts/test-phase-7-sql.mjs; resultado requerido de
+Neon **neondb | 1 | 3 | 4 | 8**. Aplicada exclusivamente en monzo_dev/monzo_test locales;
+no se accedió a Neon ni a secretos de producción.
+
+Validación: **166/166** pruebas generales y **18/18** QStash aprobadas. Repetición final
+**26/26** de automatizaciones después de ajustar la pausa inicial y los textos de
+recuperación. Incluyen aislamiento/roles, referencias, revisión, versiones viejas,
+ventana y mensajes demorados, límites, deduplicación, programación de IDs y claim
+concurrente, pausa durante envío y conservación del borrador del chat. Compilación
+webpack, tipos, lint y formato aprobados. SQL local temporal comprobó rollback,
+conservación, checksums, repetición sin volver a pausar conversaciones y rechazo de
+historial/esquema/destino incompatibles. Comparación de esquema local sin diferencias.
+
+Capturas de escritorio/móvil revisadas del árbol, error de guardado recuperable,
+simulador con Escape y restauración del foco, toma de atención/reanudación sin perder
+el borrador ni sacar el compositor del viewport. Los contratos de Meta/QStash usan
+transportes explícitos; la entrega real de botones/listas todavía debe probarse
+tras publicar. No se presenta simulación como envío real.
+
+Pendiente externo: ejecutar docs/sql/phase-7-upgrade.sql en Neon y confirmar la fila
+final antes de integrar el nuevo cliente en main. No requiere variables, claves o
+servicios nuevos. Después de publicar, crear/revisar el árbol, guardar, simular y
+activar solo en el número de prueba; reanudar explícitamente un hilo existente antes
+de probar desde el teléfono. Alcance, límites y pasos en docs/phase-7.md.

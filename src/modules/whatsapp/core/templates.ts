@@ -1,3 +1,4 @@
+import { pauseForHuman } from '../../automations/runtime';
 import { createHash, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import type { Prisma, PrismaClient } from '@prisma/client';
@@ -579,6 +580,7 @@ export async function enqueueTemplate(
             }
           : null,
     });
+    await pauseForHuman(tx, tenantId, conversationId);
     const message = await tx.message.create({
       data: {
         tenantId,

@@ -1,4 +1,6 @@
 import 'server-only';
+import { pauseForHuman } from '../automations/runtime';
+import { stateSchema } from '../automations/definition';
 import { z } from 'zod';
 import { Prisma } from '@prisma/client';
 import { getDb } from '@/lib/db';
@@ -289,7 +291,7 @@ export async function getThread(tenantId: string, conversationId: string, before
       })
     : null;
   if (before && !cursor) throw new AccessError(403);
-  const [messages, notes, members] = await Promise.all([
+  const [messages, notes, members, flow] = await Promise.all([
     getDb().message.findMany({
       where: {
         tenantId,
@@ -318,8 +320,32 @@ export async function getThread(tenantId: string, conversationId: string, before
       select: { user: { select: { id: true, name: true } } },
       take: 100,
     }),
+    getDb().automationFlow.findUnique({
+      where: { accountId: conversation.account.id },
+      select: { enabled: true, publishedByUserId: true },
+    }),
   ]);
+  const publisher = flow?.publishedByUserId
+    ? await getDb().membership.findUnique({
+        where: { tenantId_userId: { tenantId, userId: flow.publishedByUserId } },
+        select: { role: true },
+      })
+    : null;
+  const autoState = stateSchema.safeParse(conversation.automationState);
   return {
+    automation: flow?.publishedByUserId
+      ? {
+          enabled: flow.enabled && Boolean(publisher && publisher.role !== 'MEMBER'),
+          paused: conversation.automationPaused,
+          state: autoState.success ? autoState.data.status : null,
+          reason:
+            !publisher || publisher.role === 'MEMBER'
+              ? 'Un administrador debe volver a publicar el flujo para restablecerlo.'
+              : autoState.success
+                ? (autoState.data.reason ?? null)
+                : null,
+        }
+      : null,
     conversation: {
       id: conversation.id,
       status: conversation.status,
@@ -387,6 +413,7 @@ export async function enqueueMessage(tenantId: string, conversationId: string, i
       })) >= 30
     )
       throw new RequestError(429, 'Alcanzaste el límite de envíos por minuto. Intentá más tarde.');
+    await pauseForHuman(tx, tenantId, conversationId);
     const message = await tx.message.create({
       data: {
         tenantId,
@@ -472,6 +499,8 @@ export async function updateConversation(tenantId: string, conversationId: strin
         },
       });
     }
+    if (data.status || data.assignedUserId !== undefined)
+      await pauseForHuman(tx, tenantId, conversationId);
     return tx.conversation.update({
       where: { id: conversationId },
       data: {

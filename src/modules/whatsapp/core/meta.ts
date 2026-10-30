@@ -285,3 +285,21 @@ export function authorizationFailure(error: MetaError) {
           : 'Revisá la app, los IDs y los permisos o reintentá si hubo un problema de red.';
   return `No pudimos completar la autorización ${step} (${error.code}${error.subcode === undefined ? '' : `, subcódigo ${error.subcode}`}). ${error.diagnostic ?? reason} La nueva credencial no se guardó; la conexión anterior conserva su estado.`;
 }
+
+export async function sendInteractive(
+  phoneNumberId: string,
+  token: string,
+  to: string,
+  interactive: Record<string, unknown>,
+  callbackId: string,
+  transport?: MetaFetch,
+) {
+  return sendContent(
+    phoneNumberId,
+    token,
+    to,
+    { type: 'interactive', interactive },
+    callbackId,
+    transport,
+  );
+}

@@ -22,14 +22,18 @@ El usuario autorizó continuar el desarrollo de la siguiente fase tras revisar s
 
 El usuario autorizó esta fase y estableció UX/UI como requisito permanente. Catálogo por cuenta sincronizado con Meta, selección dentro del chat, variables, vista previa, encabezados de archivo y envío fuera de las 24 horas con validación previa. El usuario confirmó la sexta migración de Neon con neondb | 1 | 2 | 4 | 6. El usuario confirmó actualización del catálogo y envío real tras asignar al usuario del sistema el acceso a Test Messaging Account, además de Test WhatsApp Account. Ver `docs/phase-5.md`.
 
-## Fase 6 · Agentes IA con Gemini — desarrollo autorizado
+## Fase 6 · Agentes IA con Gemini — laboratorio publicado y confirmado
 
-El usuario eligió el nivel gratuito para pruebas. Primera entrega: laboratorio por empresa con instrucciones, conocimientos ficticios, pausa, límites de intentos y respuestas de prueba. Las condiciones de Google excluyen datos personales/confidenciales del servicio gratuito: no se carga historial real ni se responde automáticamente en WhatsApp. La asistencia con datos reales y automatización se definirán aparte. El usuario confirmó la séptima migración de Neon con neondb | 1 | 10 | 7. Preparada para publicación; falta confirmar GEMINI_API_KEY de servidor y una prueba real con datos ficticios. Ver docs/phase-6.md.
+El usuario eligió el nivel gratuito para pruebas. Primera entrega: laboratorio por empresa con instrucciones, conocimientos ficticios, pausa, límites de intentos y respuestas de prueba. Las condiciones de Google excluyen datos personales/confidenciales del servicio gratuito: no se carga historial real ni se responde automáticamente en WhatsApp. La asistencia con datos reales y automatización se definirán aparte. El usuario confirmó la séptima migración de Neon con neondb | 1 | 10 | 7. Publicada tras configurar GEMINI_API_KEY; el usuario confirmó una respuesta real usando conocimientos ficticios. La revisión de Gemini pago no activó facturación ni el uso de conversaciones reales. Ver docs/phase-6.md.
+
+## Fase 7 · Automatizaciones guiadas — desarrollo autorizado
+
+Árbol visual por número, preguntas con botones/listas, respuestas finales y derivación al equipo. Borradores separados de la publicación, simulador local, pausa y reanudación explícitas en el chat. No depende de Gemini ni activa IA paga. Las conversaciones existentes permanecen bajo control humano hasta reanudarlas. Requiere octava migración; no se publica antes de confirmar Neon. Ver docs/phase-7.md.
 
 ## Fases posteriores · Por definir y autorizar
 
 1. Completar agentes IA: asistencia con datos reales según tratamiento contratado, automatización y escalamiento.
-2. Automatizaciones y herramientas externas sobre el worker.
+2. Ampliar automatizaciones: condiciones, herramientas externas e integraciones.
 3. Onboarding comercial de canales/Embedded Signup según requisitos de Meta.
 4. Analíticas verificables, CRM comercial, suscripciones y facturación.
 

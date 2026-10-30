@@ -23,6 +23,7 @@ export type Channels = {
   pendingJobs: number;
 };
 export type ChatMessage = {
+  automation?: boolean;
   id: string;
   direction: 'INBOUND' | 'OUTBOUND';
   status: string;
@@ -48,6 +49,12 @@ export type ChatSummary = {
   messages: ChatMessage[];
 };
 export type ChatThread = {
+  automation?: {
+    enabled: boolean;
+    paused: boolean;
+    state: string | null;
+    reason: string | null;
+  } | null;
   conversation: Omit<ChatSummary, 'messages' | 'lastMessageAt'>;
   messages: ChatMessage[];
   hasMore: boolean;
