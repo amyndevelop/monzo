@@ -268,3 +268,15 @@ de GEMINI_API_KEY en Vercel y el acceso real al modelo todavía no están confir
 El laboratorio permite guardar la configuración sin clave y comunica por qué no se
 puede consultar Gemini hasta que el servidor esté configurado. El despliegue no activa
 agentes automáticamente ni envía mensajes de WhatsApp.
+
+## Gemini: despliegue inicial completado y clave cargada por el usuario
+
+El PR #4 se integró en main como 86e1fd2; los despliegues de monzo y monzo-v
+terminaron correctamente según los estados de Vercel en GitHub. Después, el usuario
+confirmó que guardó GEMINI_API_KEY en Vercel Production de monzo-v. No se leyó ni
+se comprobó el valor del secreto desde este entorno.
+
+Esta actualización documental activa un nuevo despliegue desde main para que Vercel
+aplique las variables actuales. El acceso efectivo al modelo y la cuota gratuita
+se confirmarán con una pregunta ficticia desde el laboratorio autenticado. No se
+considera la presencia declarada de la clave como prueba de respuesta real de Gemini.
