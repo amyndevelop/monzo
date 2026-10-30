@@ -28,7 +28,7 @@ El usuario eligió el nivel gratuito para pruebas. Primera entrega: laboratorio 
 
 ## Fase 7 · Automatizaciones guiadas — desarrollo autorizado
 
-Árbol visual por número, preguntas con botones/listas, respuestas finales y derivación al equipo. Borradores separados de la publicación, simulador local, pausa y reanudación explícitas en el chat. No depende de Gemini ni activa IA paga. Las conversaciones existentes permanecen bajo control humano hasta reanudarlas. Requiere octava migración; no se publica antes de confirmar Neon. Ver docs/phase-7.md.
+Árbol visual por número, preguntas con botones/listas, respuestas finales y derivación al equipo. Borradores separados de la publicación, simulador local, pausa y reanudación explícitas en el chat. No depende de Gemini ni activa IA paga. Las conversaciones existentes permanecen bajo control humano hasta reanudarlas. El usuario confirmó la octava migración de Neon con neondb | 1 | 3 | 4 | 8. Lista para publicar; pendiente verificar producción y un recorrido real de botones/listas. Ver docs/phase-7.md.
 
 ## Fases posteriores · Por definir y autorizar
 

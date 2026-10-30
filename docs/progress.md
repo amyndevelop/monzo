@@ -333,3 +333,16 @@ final antes de integrar el nuevo cliente en main. No requiere variables, claves 
 servicios nuevos. Después de publicar, crear/revisar el árbol, guardar, simular y
 activar solo en el número de prueba; reanudar explícitamente un hilo existente antes
 de probar desde el teléfono. Alcance, límites y pasos en docs/phase-7.md.
+
+## Neon Fase 7 confirmado · Integración para publicación
+
+El usuario compartió **neondb | 1 | 3 | 4 | 8**: AutomationFlow, tres columnas de
+conversación, cuatro de mensaje y ocho migraciones aplicadas. Se confirma la
+dependencia de esquema antes de integrar el PR #5 en main. No se accedió a Neon.
+
+Se mantienen las verificaciones registradas de 166 pruebas generales, 18 QStash y
+repetición final de 26 casos de automatizaciones. Los dos previews de Vercel del
+código de la entrega finalizaron correctamente. Se prepara la publicación; falta
+confirmar los despliegues de producción y un recorrido real de botones/listas.
+No se activa ningún flujo del usuario automáticamente. Un hilo existente debe
+reanudarse expresamente después de publicar su flujo para probarlo con el teléfono.
