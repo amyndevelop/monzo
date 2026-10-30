@@ -90,3 +90,14 @@ trabajos pendientes. El resultado aparece junto al canal mediante status/alert; 
 botón conserva foco y muestra carga mientras se deshabilitan acciones simultáneas.
 No requiere migraciones. tests/authorization.spec.ts cubre recuperación, aislamiento,
 rotación, rechazo en ambas consultas, fallos de red, descifrado y ausencia del número.
+
+### Canales desconectados
+
+El DTO de Canales informa solo `hasCredential`, nunca el token cifrado. La tarjeta
+prioriza el estado desconectado sobre errores históricos y mantiene visible el botón
+de comprobación. Si no hay credencial, el botón queda deshabilitado con una explicación
+visible y asociada por aria-describedby: hay que completar una nueva autorización.
+Si existe credencial en un canal desconectado, la comprobación admite las lecturas,
+pero conserva enabled=false y explica que no reconecta el canal. El CAS compara el
+estado habilitado original para respetar desconexiones concurrentes. La desconexión
+normal elimina el token, por lo que no hay un token anterior recuperable en ese caso.

@@ -16,11 +16,12 @@ export async function checkSavedAuthorization(
       code: 'ACCOUNT_UNAVAILABLE',
       message: 'El canal no está disponible para esta empresa.',
     };
-  if (!account.enabled || !account.tokenEncrypted)
+  if (!account.tokenEncrypted)
     return {
       ok: false,
-      code: 'ACCOUNT_DISABLED',
-      message: 'El canal está desconectado o no tiene credencial. Autorizalo desde el formulario.',
+      code: 'CREDENTIAL_MISSING',
+      message:
+        'No hay una credencial guardada para comprobar. La desconexión elimina el token; completá una nueva autorización desde el formulario.',
     };
   let token: string;
   try {
@@ -85,7 +86,7 @@ export async function checkSavedAuthorization(
     where: {
       id: accountId,
       tenantId,
-      enabled: true,
+      enabled: account.enabled,
       tokenEncrypted: account.tokenEncrypted,
       businessAccountId: account.businessAccountId,
       lastErrorCode: account.lastErrorCode,
@@ -100,8 +101,9 @@ export async function checkSavedAuthorization(
     };
   return {
     ok: true,
-    code: 'AUTHORIZED',
-    message:
-      'Meta aceptó la credencial guardada para consultar el número y las plantillas. Se quitó el bloqueo de autorización. No se enviaron mensajes ni se comprobó la entrega o la suscripción de webhooks.',
+    code: account.enabled ? 'AUTHORIZED' : 'AUTHORIZED_DISCONNECTED',
+    message: !account.enabled
+      ? 'Meta aceptó la credencial guardada para consultar el número y las plantillas. El canal sigue desconectado: esta comprobación no lo reconecta ni envía mensajes. Completá la autorización del formulario para conectarlo.'
+      : 'Meta aceptó la credencial guardada para consultar el número y las plantillas. Se quitó el bloqueo de autorización. No se enviaron mensajes ni se comprobó la entrega o la suscripción de webhooks.',
   };
 }
