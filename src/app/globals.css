@@ -4467,3 +4467,113 @@ svg {
   padding: 0 12px;
   border-radius: 10px;
 }
+
+.ai-lab {
+  display: grid;
+  gap: 20px;
+}
+.ai-lab-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.ai-card {
+  min-width: 0;
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: white;
+  display: grid;
+  gap: 16px;
+}
+.ai-card h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 19px;
+}
+.ai-card fieldset,
+.ai-card form {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.ai-card label {
+  display: grid;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.ai-card input:not([type='checkbox']),
+.ai-card textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 11px 12px;
+  background: white;
+  color: var(--foreground);
+  font: inherit;
+  font-weight: 400;
+}
+.ai-card textarea {
+  resize: vertical;
+}
+.ai-card .ai-check {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-weight: 400;
+  line-height: 1.6;
+}
+.ai-check input {
+  margin-top: 4px;
+  flex-shrink: 0;
+  accent-color: #008c99;
+}
+.ai-result {
+  padding: 16px;
+  border-radius: 12px;
+  background: #edf9f8;
+}
+.ai-result p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin-top: 10px;
+}
+.ai-empty {
+  padding: 24px;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  color: var(--muted-foreground);
+  text-align: center;
+}
+.ai-lab a {
+  color: #00818e;
+  text-decoration: underline;
+}
+.ai-card button {
+  justify-self: start;
+  max-width: 100%;
+  white-space: normal;
+}
+@media (max-width: 850px) {
+  .ai-lab-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ai-card {
+    padding: 18px;
+  }
+}
+
+.ai-card > p,
+.ai-result p {
+  font-size: 14px;
+  line-height: 1.65;
+}
+.ai-card .channel-footnote {
+  font-size: 12px;
+  line-height: 1.6;
+  color: #617b85;
+}

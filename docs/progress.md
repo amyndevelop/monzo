@@ -205,3 +205,66 @@ Cierre de verificación: **18/18** regresiones de QStash aprobadas con el client
 El usuario compartió **neondb | 1 | 2 | 4 | 6**: tabla de plantillas, dos columnas de mensajes, cuatro de catálogo y seis migraciones. Esto confirma la actualización de producción necesaria para publicar el cliente Prisma de Fase 5. No se accedió a Neon ni se solicitaron credenciales.
 
 La implementación `932a890` se integra en main para activar el despliegue automático existente de Vercel. Se mantienen las verificaciones locales previas: 120 pruebas generales, 18 de QStash y repetición de 6 recorridos UX tras el ajuste del selector de archivos. Esta integración solo actualiza el estado documental; no modifica código ni esquema. Pendientes externos: confirmar Ready del despliegue correspondiente, abrir el selector de plantillas en la conversación de prueba, actualizar el catálogo desde Meta y comprobar una plantilla aprobada en el teléfono y sus recibos. No se afirma Ready ni envío real desde este entorno.
+
+## Fase 5 confirmada en producción · Autorización de Meta resuelta
+
+El usuario confirmó catálogo actualizado (cinco plantillas visibles) y envío real
+correcto. Los diagnósticos localizaron META_100/33 en el acceso a la WABA: el usuario
+del sistema tenía acceso a Test WhatsApp Account, pero no figuraba asignado a Test
+Messaging Account, el activo con el WABA ID usado por MONZO. Después de asignarlo y
+repetir la autorización con el mismo token disponible, el usuario confirmó que todo
+funciona. Los PR #1, #2 y #3 están integrados; ambos proyectos de Vercel terminaron
+correctamente. No se copiaron tokens a este repositorio ni se alteró Neon.
+
+## Fase 6 · Laboratorio Gemini gratuito preparado
+
+El usuario eligió Gemini gratuito para pruebas. Primera entrega en
+`feat/phase-6-gemini-lab`: agente por empresa con nombre, instrucciones,
+conocimientos ficticios, pausa, revisión de configuración, cuota diaria y pregunta
+manual de prueba. Respuestas de texto revisables, sin herramientas ni envío a
+WhatsApp. No se carga historial, datos de contactos ni notas reales: las condiciones
+actuales del nivel gratuito de Google excluyen datos personales y confidenciales.
+La UI explica el tratamiento y exige confirmar datos ficticios; no promete detectar
+ni anonimizar automáticamente datos personales.
+
+Modelo fijo gemini-3.5-flash-lite, clave únicamente en GEMINI_API_KEY del servidor,
+sin fallback ni reintento automático. Endpoint fijo, timeout y respuesta acotados;
+los errores del proveedor no exponen su cuerpo. Cuotas atómicas compartidas y por
+empresa sobre RateLimit, roles revisados bajo bloqueo y respuesta invalidada ante
+pausa, cambio o revocación. No se almacena la respuesta de prueba como Message.
+
+Séptima migración aditiva 202610300003_gemini_lab, aplicada solo en monzo_dev y
+monzo_test locales. SQL protegido de Neon reproducible en docs/sql/phase-6-upgrade.sql;
+el resultado requerido es **neondb | 1 | 10 | 7**. Se comprobó rollback atómico,
+repetición segura, checksums, conservación de usuario/mensaje, referencias de tenant,
+unicidad y rechazo de destino/historial/esquema incompatibles en una base temporal
+exclusivamente local. Prisma validate y comparación de esquema sin diferencias.
+
+Validación: **140/140** pruebas generales y **18/18** QStash en escritorio/móvil,
+compilación webpack, TypeScript, lint, formato y diff correctos. La suite incluye
+12 casos de IA (seis por proyecto) con transportes explícitos de Gemini y sesión/DB
+reales, límites concurrentes, pausa durante HTTP, errores privados y recuperación de
+la pregunta. Se corrigió un aislamiento de prueba previo que dejaba cambiada la
+clave de cifrado de fixtures; no se cambió el cifrado de producción. Capturas de
+escritorio/móvil revisadas sin desborde, con resultado enfocado y formularios conservados.
+
+Pendientes externos: aplicar/confirmar la séptima migración en Neon y configurar una
+clave de proyecto gratuito sin facturación en Vercel. No se consultó Gemini real,
+no se accedió a secretos de producción ni se integra esta entrega a main antes de
+confirmar la migración. Después del despliegue, guardar un agente ficticio habilitado
+y probar una pregunta para confirmar clave, acceso al modelo y cuota del proveedor.
+La asistencia con conversaciones reales y los agentes automáticos quedan fuera de
+esta primera entrega. Alcance y pasos detallados en docs/phase-6.md.
+
+## Neon Fase 6 confirmado · Preparación para publicación
+
+El usuario compartió el resultado **neondb | 1 | 10 | 7**, confirmando tabla AiAgent,
+sus diez columnas y siete migraciones aplicadas. La dependencia de esquema para
+publicar Fase 6 queda satisfecha. No se conectó a Neon desde este entorno.
+
+Se prepara la integración del PR #4 y se mantiene la validación previa de 140 pruebas
+generales, 18 QStash y cuatro verificaciones finales de interfaz/contrato. La presencia
+de GEMINI_API_KEY en Vercel y el acceso real al modelo todavía no están confirmados.
+El laboratorio permite guardar la configuración sin clave y comunica por qué no se
+puede consultar Gemini hasta que el servidor esté configurado. El despliegue no activa
+agentes automáticamente ni envía mensajes de WhatsApp.

@@ -4,6 +4,12 @@ import { encryptToken } from '../src/modules/whatsapp/core/crypto';
 import { checkSavedAuthorization } from '../src/modules/whatsapp/core/authorization';
 import type { MetaFetch } from '../src/modules/whatsapp/core/meta';
 
+const initialEncryptionKey = process.env.WHATSAPP_ENCRYPTION_KEY;
+test.afterEach(() => {
+  if (initialEncryptionKey === undefined) delete process.env.WHATSAPP_ENCRYPTION_KEY;
+  else process.env.WHATSAPP_ENCRYPTION_KEY = initialEncryptionKey;
+});
+
 test('comprobación guardada: solo GET, recuperación, rechazo, aislamiento y rotación', async () => {
   process.env.WHATSAPP_ENCRYPTION_KEY = 'ab'.repeat(32);
   for (const scenario of [
