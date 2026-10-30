@@ -128,3 +128,50 @@ test('Meta: la variante rechazada o incierta no provoca un tercer envío', async
     expect(recipients).toEqual([waId, '541112345678']);
   }
 });
+
+test('Meta: renovación distingue consulta y suscripción sin exponer la credencial', async () => {
+  const { verifyAndSubscribe, authorizationFailure, MetaError } =
+    await import('../src/modules/whatsapp/core/meta');
+  for (const failSubscription of [false, true]) {
+    const calls: string[] = [];
+    const transport: MetaFetch = async (url) => {
+      calls.push(url);
+      return failSubscription && calls.length === 1
+        ? { ok: true, status: 200, json: async () => ({ data: [{ id: phoneId }] }) }
+        : { ok: false, status: 400, json: async () => ({ error: { code: 100, message: token } }) };
+    };
+    try {
+      await verifyAndSubscribe('1171915459097699', phoneId, token, transport);
+      throw new Error('Expected rejection');
+    } catch (error) {
+      expect(error).toBeInstanceOf(MetaError);
+      const failure = error as InstanceType<typeof MetaError>;
+      expect(failure.authorizationStep).toBe(failSubscription ? 'subscription' : 'phone_lookup');
+      expect(authorizationFailure(failure)).toContain('META_100');
+      expect(authorizationFailure(failure)).toContain('La nueva credencial no se guardó');
+      expect(authorizationFailure(failure)).not.toContain(token);
+      expect(calls).toHaveLength(failSubscription ? 2 : 1);
+    }
+  }
+});
+
+test('Meta: autorización completa comprueba pertenencia antes de suscribir', async () => {
+  const { verifyAndSubscribe } = await import('../src/modules/whatsapp/core/meta');
+  const calls: string[] = [];
+  const transport: MetaFetch = async (url) => {
+    calls.push(url);
+    return {
+      ok: true,
+      status: 200,
+      json: async () =>
+        calls.length === 1
+          ? { data: [{ id: phoneId, display_phone_number: '+54 11', verified_name: 'MONZO' }] }
+          : { success: true },
+    };
+  };
+  await expect(verifyAndSubscribe('1171915459097699', phoneId, token, transport)).resolves.toEqual({
+    displayPhone: '+54 11',
+    displayName: 'MONZO',
+  });
+  expect(calls[1]).toContain('/subscribed_apps');
+});

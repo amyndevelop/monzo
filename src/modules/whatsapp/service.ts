@@ -5,7 +5,7 @@ import { getDb } from '@/lib/db';
 import { requireTenantAccess, AccessError } from '@/modules/access/policy';
 import { RequestError, idSchema } from '@/modules/tenants/http';
 import { encryptToken, whatsappConfigured } from './core/crypto';
-import { verifyAndSubscribe, MetaError } from './core/meta';
+import { verifyAndSubscribe, MetaError, authorizationFailure } from './core/meta';
 import { messageFields, presentMessage } from './core/message';
 import { withinWindow } from './core/payload';
 import { dispatchJobs, processorMode, qstashConfigurationIssues } from './core/qstash';
@@ -101,7 +101,7 @@ export async function connectAccount(tenantId: string, input: unknown) {
     throw new RequestError(
       502,
       error instanceof MetaError
-        ? `No pudimos autorizar el número en Meta (${error.code}). Revisá la app, los IDs y los permisos.`
+        ? authorizationFailure(error)
         : 'No pudimos verificar la conexión con Meta.',
     );
   }
@@ -525,4 +525,28 @@ export async function listContacts(tenantId: string, query: string) {
     orderBy: { updatedAt: 'desc' },
     take: 100,
   });
+}
+
+export async function checkAccountAuthorization(tenantId: string, accountId: string) {
+  await requireTenantAccess(idSchema.parse(tenantId), ['OWNER']);
+  idSchema.parse(accountId);
+  const { checkSavedAuthorization } = await import('./core/authorization');
+  const { consumeLimit } = await import('./core/attachments');
+  const { AttachmentError } = await import('./core/media');
+  try {
+    await getDb().$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT "id" FROM "Tenant" WHERE "id"=${tenantId} FOR UPDATE`;
+      await consumeLimit(
+        tx,
+        tenantId,
+        'authorization',
+        5,
+        'Podés comprobar la autorización hasta 5 veces por minuto. Esperá un momento.',
+      );
+    });
+  } catch (error) {
+    if (error instanceof AttachmentError) throw new RequestError(error.status, error.message);
+    throw error;
+  }
+  return checkSavedAuthorization(getDb(), tenantId, accountId);
 }

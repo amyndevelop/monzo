@@ -9,6 +9,10 @@ export function ChannelsPanel({ tenantId }: { tenantId: string }) {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
+  const [checking, setChecking] = useState<string | null>(null);
+  const [diagnostics, setDiagnostics] = useState<Record<string, { ok: boolean; message: string }>>(
+    {},
+  );
   const base = `/api/workspaces/${tenantId}/whatsapp`;
   useEffect(() => {
     let active = true;
@@ -88,19 +92,78 @@ export function ChannelsPanel({ tenantId }: { tenantId: string }) {
                       <p>{account.displayPhone}</p>
                     </div>
                     <span className="small-badge">
-                      {account.enabled ? 'Número autorizado' : 'Desconectado'}
+                      {!account.enabled
+                        ? 'Desconectado'
+                        : account.lastErrorCode === 'META_190'
+                          ? 'Requiere autorización'
+                          : 'Número autorizado'}
                     </span>
                   </div>
                   <p className="channel-explanation">
-                    {account.enabled
-                      ? 'Autorización del número comprobada en Meta. La recepción se verificará con el primer mensaje real.'
-                      : 'El canal está deshabilitado en MONZO.'}
+                    {account.lastErrorCode === 'META_190'
+                      ? 'Meta rechazó la credencial guardada. El envío y la actualización de plantillas están bloqueados hasta completar una nueva autorización.'
+                      : account.enabled
+                        ? 'Autorización del número comprobada en Meta. La recepción se verificará con el primer mensaje real.'
+                        : 'El canal está deshabilitado en MONZO.'}
                   </p>
                   {account.lastErrorCode && (
                     <p className="form-error">
                       Meta informó un problema ({account.lastErrorCode}). Un propietario debe
                       revisar la conexión.
                     </p>
+                  )}
+                  {data.canManage && account.enabled && (
+                    <div>
+                      <Button
+                        variant="outline"
+                        disabled={busy}
+                        onClick={async () => {
+                          setBusy(true);
+                          setChecking(account.id);
+                          try {
+                            const result = await whatsappRequest<{ ok: boolean; message: string }>(
+                              base + '/accounts/' + account.id + '/authorization',
+                              'POST',
+                              {},
+                            );
+                            setDiagnostics((previous) => ({ ...previous, [account.id]: result }));
+                            await refresh();
+                          } catch (error) {
+                            setDiagnostics((previous) => ({
+                              ...previous,
+                              [account.id]: {
+                                ok: false,
+                                message:
+                                  error instanceof Error
+                                    ? error.message
+                                    : 'No pudimos comprobar la autorización.',
+                              },
+                            }));
+                          } finally {
+                            setChecking(null);
+                            setBusy(false);
+                          }
+                        }}
+                      >
+                        <RefreshCw size={15} />
+                        {checking === account.id
+                          ? 'Comprobando con Meta…'
+                          : 'Comprobar autorización guardada'}
+                      </Button>
+                      <p className="channel-footnote">
+                        No necesitás copiar el token. Consulta el número y las plantillas; si Meta
+                        los acepta, quita el bloqueo. No envía mensajes de prueba. Los trabajos
+                        pendientes pueden continuar al recuperarse el canal.
+                      </p>
+                      {diagnostics[account.id] && (
+                        <p
+                          role={diagnostics[account.id].ok ? 'status' : 'alert'}
+                          className={diagnostics[account.id].ok ? 'form-message' : 'form-error'}
+                        >
+                          {diagnostics[account.id].message}
+                        </p>
+                      )}
+                    </div>
                   )}
                   {data.canManage && account.enabled && (
                     <Button
@@ -228,7 +291,9 @@ export function ChannelsPanel({ tenantId }: { tenantId: string }) {
               <p>
                 Usá los datos de WhatsApp Business Cloud API de tu aplicación de Meta. El token se
                 guarda cifrado y nunca se vuelve a mostrar. Copiá los dos identificadores numéricos
-                y el token de acceso que aparecen en Meta.
+                y el token de acceso que aparecen en Meta. Si ya no podés copiar el token, generá
+                otro en Meta y completá la autorización. Una renovación fallida conserva la conexión
+                anterior; no confirma que la credencial nueva se haya guardado.
               </p>
               <form
                 className="account-form"

@@ -38,6 +38,7 @@ export type TemplateItem = {
 export type TemplateCatalog = {
   items: TemplateItem[];
   canSync: boolean;
+  blockedReason?: string | null;
   syncedAt: string | null;
   hasMore: boolean;
   enabled: boolean;

@@ -100,6 +100,13 @@ export async function listTemplates(
     total,
     nextPage: items.length > 50 ? items[49].id : null,
     canSync: membership.role !== 'MEMBER',
+    blockedReason: !context.account.enabled
+      ? 'El canal está desconectado. Un propietario debe conectarlo en Canales.'
+      : !context.account.tokenEncrypted
+        ? 'No hay una credencial guardada. Un propietario debe autorizar el número en Canales.'
+        : context.account.lastErrorCode === 'META_190'
+          ? 'Meta rechazó la credencial guardada (META_190). Un propietario debe completar la autorización en Canales para actualizar y enviar plantillas.'
+          : null,
     syncedAt: context.account.templatesSyncedAt,
     hasMore: Boolean(context.account.templatesNextCursor),
     enabled:
