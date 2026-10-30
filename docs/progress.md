@@ -255,3 +255,16 @@ confirmar la migración. Después del despliegue, guardar un agente ficticio hab
 y probar una pregunta para confirmar clave, acceso al modelo y cuota del proveedor.
 La asistencia con conversaciones reales y los agentes automáticos quedan fuera de
 esta primera entrega. Alcance y pasos detallados en docs/phase-6.md.
+
+## Neon Fase 6 confirmado · Preparación para publicación
+
+El usuario compartió el resultado **neondb | 1 | 10 | 7**, confirmando tabla AiAgent,
+sus diez columnas y siete migraciones aplicadas. La dependencia de esquema para
+publicar Fase 6 queda satisfecha. No se conectó a Neon desde este entorno.
+
+Se prepara la integración del PR #4 y se mantiene la validación previa de 140 pruebas
+generales, 18 QStash y cuatro verificaciones finales de interfaz/contrato. La presencia
+de GEMINI_API_KEY en Vercel y el acceso real al modelo todavía no están confirmados.
+El laboratorio permite guardar la configuración sin clave y comunica por qué no se
+puede consultar Gemini hasta que el servidor esté configurado. El despliegue no activa
+agentes automáticamente ni envía mensajes de WhatsApp.

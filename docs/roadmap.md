@@ -24,7 +24,7 @@ El usuario autorizó esta fase y estableció UX/UI como requisito permanente. Ca
 
 ## Fase 6 · Agentes IA con Gemini — desarrollo autorizado
 
-El usuario eligió el nivel gratuito para pruebas. Primera entrega: laboratorio por empresa con instrucciones, conocimientos ficticios, pausa, límites de intentos y respuestas de prueba. Las condiciones de Google excluyen datos personales/confidenciales del servicio gratuito: no se carga historial real ni se responde automáticamente en WhatsApp. La asistencia con datos reales y automatización se definirán aparte. Requiere séptima migración y GEMINI_API_KEY de servidor; no se publica antes de confirmar Neon. Ver docs/phase-6.md.
+El usuario eligió el nivel gratuito para pruebas. Primera entrega: laboratorio por empresa con instrucciones, conocimientos ficticios, pausa, límites de intentos y respuestas de prueba. Las condiciones de Google excluyen datos personales/confidenciales del servicio gratuito: no se carga historial real ni se responde automáticamente en WhatsApp. La asistencia con datos reales y automatización se definirán aparte. El usuario confirmó la séptima migración de Neon con neondb | 1 | 10 | 7. Preparada para publicación; falta confirmar GEMINI_API_KEY de servidor y una prueba real con datos ficticios. Ver docs/phase-6.md.
 
 ## Fases posteriores · Por definir y autorizar
 
