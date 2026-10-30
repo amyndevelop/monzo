@@ -6,6 +6,7 @@ export type Channel = {
   displayPhone: string;
   displayName: string;
   enabled: boolean;
+  hasCredential?: boolean;
   verifiedAt: string | null;
   lastErrorCode: string | null;
 };

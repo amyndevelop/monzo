@@ -28,7 +28,7 @@ export async function channelStatus(tenantId: string) {
   const [accounts, heartbeat, failedEvents, pendingEvents, pendingMessages] = await Promise.all([
     getDb().whatsappAccount.findMany({
       where: { tenantId },
-      select: accountFields,
+      select: { ...accountFields, tokenEncrypted: true },
       orderBy: { createdAt: 'asc' },
     }),
     getDb().workerHeartbeat.findUnique({ where: { id: 'whatsapp' } }),
@@ -54,7 +54,10 @@ export async function channelStatus(tenantId: string) {
   const recent = Boolean(heartbeat && heartbeat.seenAt.getTime() > Date.now() - 45000);
   const processorIssues = mode === 'qstash' ? qstashConfigurationIssues() : [];
   return {
-    accounts,
+    accounts: accounts.map(({ tokenEncrypted, ...account }) => ({
+      ...account,
+      hasCredential: Boolean(tokenEncrypted),
+    })),
     configured: whatsappConfigured(),
     canManage: membership.role === 'OWNER',
     workerAlive: recent,

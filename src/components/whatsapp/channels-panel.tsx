@@ -100,23 +100,33 @@ export function ChannelsPanel({ tenantId }: { tenantId: string }) {
                     </span>
                   </div>
                   <p className="channel-explanation">
-                    {account.lastErrorCode === 'META_190'
-                      ? 'Meta rechazó la credencial guardada. El envío y la actualización de plantillas están bloqueados hasta completar una nueva autorización.'
-                      : account.enabled
-                        ? 'Autorización del número comprobada en Meta. La recepción se verificará con el primer mensaje real.'
-                        : 'El canal está deshabilitado en MONZO.'}
+                    {!account.enabled
+                      ? account.hasCredential
+                        ? 'El canal está desconectado. Podés comprobar la credencial guardada sin reconectarlo. El envío y la actualización de plantillas siguen deshabilitados.'
+                        : 'El canal está desconectado y no tiene una credencial guardada. No se puede comprobar el token anterior. Para volver a conectarlo, completá la autorización del formulario.'
+                      : account.lastErrorCode === 'META_190'
+                        ? 'Meta rechazó la credencial guardada. El envío y la actualización de plantillas están bloqueados hasta completar una nueva autorización.'
+                        : account.enabled
+                          ? 'Autorización del número comprobada en Meta. La recepción se verificará con el primer mensaje real.'
+                          : 'El canal está deshabilitado en MONZO.'}
                   </p>
                   {account.lastErrorCode && (
                     <p className="form-error">
-                      Meta informó un problema ({account.lastErrorCode}). Un propietario debe
-                      revisar la conexión.
+                      {!account.enabled
+                        ? 'Último error registrado antes de esta comprobación'
+                        : 'Meta informó un problema'}{' '}
+                      ({account.lastErrorCode}).{' '}
+                      {!account.enabled
+                        ? 'Este error histórico no confirma el estado actual de un token nuevo.'
+                        : 'Un propietario debe revisar la conexión.'}
                     </p>
                   )}
-                  {data.canManage && account.enabled && (
+                  {data.canManage && (
                     <div>
                       <Button
                         variant="outline"
-                        disabled={busy}
+                        disabled={busy || !account.hasCredential}
+                        aria-describedby={`authorization-help-${account.id}`}
                         onClick={async () => {
                           setBusy(true);
                           setChecking(account.id);
@@ -150,10 +160,12 @@ export function ChannelsPanel({ tenantId }: { tenantId: string }) {
                           ? 'Comprobando con Meta…'
                           : 'Comprobar autorización guardada'}
                       </Button>
-                      <p className="channel-footnote">
-                        No necesitás copiar el token. Consulta el número y las plantillas; si Meta
-                        los acepta, quita el bloqueo. No envía mensajes de prueba. Los trabajos
-                        pendientes pueden continuar al recuperarse el canal.
+                      <p className="channel-footnote" id={`authorization-help-${account.id}`}>
+                        {!account.hasCredential
+                          ? 'Comprobación no disponible: no hay una credencial guardada. Completá el formulario de autorización para conectar este número.'
+                          : !account.enabled
+                            ? 'Consulta el número y las plantillas con la credencial guardada. No reconecta el canal ni envía mensajes.'
+                            : 'No necesitás copiar el token. Consulta el número y las plantillas; si Meta los acepta, quita el bloqueo. No envía mensajes de prueba. Los trabajos pendientes pueden continuar al recuperarse el canal.'}
                       </p>
                       {diagnostics[account.id] && (
                         <p

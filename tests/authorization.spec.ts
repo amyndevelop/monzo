@@ -15,6 +15,7 @@ test('comprobación guardada: solo GET, recuperación, rechazo, aislamiento y ro
     'rotated',
     'unreadable',
     'disabled',
+    'missing',
     'wrong-phone',
     'template-190',
   ]) {
@@ -28,9 +29,11 @@ test('comprobación guardada: solo GET, recuperación, rechazo, aislamiento y ro
       enabled: scenario !== 'disabled',
       lastErrorCode: 'META_190',
       tokenEncrypted:
-        scenario === 'unreadable'
-          ? 'invalid'
-          : encryptToken('private-test-token', 'tenant', '1309498698924805'),
+        scenario === 'missing'
+          ? null
+          : scenario === 'unreadable'
+            ? 'invalid'
+            : encryptToken('private-test-token', 'tenant', '1309498698924805'),
     };
     const db = {
       whatsappAccount: {
@@ -67,12 +70,12 @@ test('comprobación guardada: solo GET, recuperación, rechazo, aislamiento y ro
       };
     };
     const result = await checkSavedAuthorization(db, 'tenant', 'account', transport);
-    expect(result.ok).toBe(scenario === 'success');
+    expect(result.ok).toBe(['success', 'disabled'].includes(scenario));
     expect(JSON.stringify(result)).not.toContain('private-test-token');
     expect(calls.every((call) => call.method === 'GET' && !call.url.includes('/messages'))).toBe(
       true,
     );
-    if (['foreign', 'unreadable', 'disabled'].includes(scenario)) expect(calls).toHaveLength(0);
+    if (['foreign', 'unreadable', 'missing'].includes(scenario)) expect(calls).toHaveLength(0);
     if (['190', 'template-190'].includes(scenario)) {
       expect(writes).toEqual([
         expect.objectContaining({
@@ -83,11 +86,11 @@ test('comprobación guardada: solo GET, recuperación, rechazo, aislamiento y ro
           data: { lastErrorCode: 'META_190' },
         }),
       ]);
-    } else if (['success', 'rotated'].includes(scenario)) {
+    } else if (['success', 'rotated', 'disabled'].includes(scenario)) {
       expect(writes).toEqual([
         expect.objectContaining({
           where: expect.objectContaining({
-            enabled: true,
+            enabled: scenario !== 'disabled',
             tokenEncrypted: account.tokenEncrypted,
             lastErrorCode: 'META_190',
           }),
