@@ -46,3 +46,47 @@ La migración aditiva `202610300002_whatsapp_templates` crea WhatsappTemplate, a
 ## Verificación
 
 `tests/templates.spec.ts` cubre paginación/cursor, aislamiento, permisos y cambios durante HTTP; variables/formatos especiales; envío fuera de ventana, idempotencia y concurrencia; payloads y comprobación previa con Meta mediante transportes explícitos; pausas/cambios de definición, resultados inciertos y revocación; encabezados privados y recuperación/foco/layout de la UI en escritorio/móvil. Las pruebas de API/UI usan sesión real y PostgreSQL local. La entrega real por Meta se verifica después del despliegue. Resultados finales en `docs/progress.md`.
+
+## Diagnóstico de renovación de autorización (30 de octubre de 2026)
+
+La renovación consulta `WABA/phone_numbers` y después solicita `WABA/subscribed_apps`.
+Solo guarda el token cifrado y limpia `lastErrorCode` cuando ambas operaciones terminan
+correctamente. Por eso un META_100 durante una renovación puede coexistir con el
+META_190 anterior: el token nuevo no llegó a guardarse. META_100 por sí solo no prueba
+caducidad ni permite identificar qué permiso o parámetro rechazó Meta.
+
+Los errores ahora identifican la etapa que falló y aclaran que la conexión anterior
+conserva su estado. No se devuelve el mensaje libre de Meta, que podría contener
+información sensible. Canales muestra «Requiere autorización» para META_190 en vez de
+«Número autorizado». El catálogo explica de forma visible por qué se bloquea la
+actualización y el envío, y distingue el permiso de administrador del estado del canal.
+El formulario conserva los datos ante un rechazo; el token sigue siendo un campo de
+contraseña y solo se borra tras el éxito. Si el token ya no puede copiarse desde Meta,
+hay que generar otro y completar la autorización. No se recupera ni se muestra la
+credencial cifrada existente.
+
+Este cambio no requiere migraciones. La causa concreta del META_100 reportado queda
+pendiente de una nueva solicitud autorizada: los errores históricos no conservaron la
+etapa. Los IDs informados son Phone Number ID 1309498698924805 y WABA ID
+1171915459097699; no se incluyen como valores predeterminados para otros tenants.
+
+### Comprobar la credencial existente
+
+Canales incorpora «Comprobar autorización guardada» para propietarios de canales
+habilitados. El POST exige sesión, rol OWNER y origen exacto; tiene límite de cinco
+comprobaciones por empresa/minuto. Descifra exclusivamente en el servidor y ejecuta
+GET de números y plantillas en Meta. No devuelve tokens, mensajes libres de Meta ni
+respuestas del proveedor. No suscribe apps, envía mensajes ni publica trabajos.
+
+Solo elimina lastErrorCode cuando ambas lecturas tienen éxito. La escritura compara
+tenant, credencial, WABA, estado habilitado y error previo para no pisar una rotación o
+desconexión concurrente. META_190 confirmado marca solo esa versión de credencial;
+otros fallos mantienen el bloqueo. Un error de descifrado se informa como problema de
+configuración de MONZO y no como rechazo de Meta. El éxito comprueba esas lecturas,
+no la entrega de mensajes, el permiso de envío ni la suscripción de webhooks.
+
+La UI explica que quitar el bloqueo puede permitir que el procesador continúe los
+trabajos pendientes. El resultado aparece junto al canal mediante status/alert; el
+botón conserva foco y muestra carga mientras se deshabilitan acciones simultáneas.
+No requiere migraciones. tests/authorization.spec.ts cubre recuperación, aislamiento,
+rotación, rechazo en ambas consultas, fallos de red, descifrado y ausencia del número.

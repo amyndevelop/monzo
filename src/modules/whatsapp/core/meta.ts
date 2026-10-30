@@ -4,6 +4,7 @@ export class MetaError extends Error {
   constructor(
     public code: string,
     public uncertain = false,
+    public authorizationStep?: 'phone_lookup' | 'subscription',
   ) {
     super('WhatsApp request failed.');
   }
@@ -71,21 +72,32 @@ export async function verifyAndSubscribe(
   transport?: MetaFetch,
 ) {
   if (!phoneId.test(wabaId) || !phoneId.test(phoneNumberId)) throw new MetaError('IDENTIFIER');
-  const data = await graphRequest(
+  const authorize = async (
+    step: 'phone_lookup' | 'subscription',
+    path: string,
+    method = 'GET',
+    body?: unknown,
+  ) => {
+    try {
+      return await graphRequest(path, token, method, body, transport);
+    } catch (error) {
+      if (error instanceof MetaError) error.authorizationStep = step;
+      throw error;
+    }
+  };
+  const data = await authorize(
+    'phone_lookup',
     `${wabaId}/phone_numbers?fields=id,display_phone_number,verified_name&limit=100`,
-    token,
-    'GET',
-    undefined,
-    transport,
   );
   const phones = data.data as
     { id: string; display_phone_number?: string; verified_name?: string }[] | undefined;
   const phone = Array.isArray(phones)
     ? phones.find((item) => item.id === phoneNumberId)
     : undefined;
-  if (!phone) throw new MetaError('PHONE_NOT_IN_WABA');
-  const subscribed = await graphRequest(`${wabaId}/subscribed_apps`, token, 'POST', {}, transport);
-  if (subscribed.success !== true) throw new MetaError('SUBSCRIPTION_FAILED');
+  if (!phone) throw new MetaError('PHONE_NOT_IN_WABA', false, 'phone_lookup');
+  const subscribed = await authorize('subscription', `${wabaId}/subscribed_apps`, 'POST', {});
+  if (subscribed.success !== true)
+    throw new MetaError('SUBSCRIPTION_FAILED', false, 'subscription');
   return {
     displayPhone: String(phone.display_phone_number ?? phoneNumberId).slice(0, 60),
     displayName: String(phone.verified_name ?? 'WhatsApp Business').slice(0, 120),
@@ -204,4 +216,22 @@ export async function sendTemplate(
     callbackId,
     transport,
   );
+}
+
+export function authorizationFailure(error: MetaError) {
+  const step =
+    error.authorizationStep === 'subscription'
+      ? 'al suscribir la app a los mensajes'
+      : error.authorizationStep === 'phone_lookup'
+        ? 'al consultar los números de la cuenta de WhatsApp Business'
+        : 'al verificar el número';
+  const reason =
+    error.code === 'META_100'
+      ? 'Meta rechazó la solicitud. Esto no demuestra que el token haya vencido: revisá los IDs, el acceso a esa cuenta y la configuración de la app.'
+      : error.code === 'META_190'
+        ? 'Meta rechazó la credencial presentada; puede haber vencido, sido revocada o no ser válida para esta solicitud.'
+        : error.code === 'PHONE_NOT_IN_WABA'
+          ? 'El número no aparece entre los primeros 100 números de esa cuenta. Revisá que ambos IDs correspondan a la misma cuenta.'
+          : 'Revisá la app, los IDs y los permisos o reintentá si hubo un problema de red.';
+  return `No pudimos completar la autorización ${step} (${error.code}). ${reason} La nueva credencial no se guardó; la conexión anterior conserva su estado.`;
 }

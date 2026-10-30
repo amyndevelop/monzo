@@ -280,6 +280,16 @@ export function TemplateDialog({
               </button>
             )}
           </div>
+          {catalog?.blockedReason && (
+            <p className="form-error" role="status">
+              {catalog.blockedReason}
+            </p>
+          )}
+          {catalog && !catalog.canSync && (
+            <p className="channel-footnote">
+              Solo un administrador o propietario puede actualizar el catálogo.
+            </p>
+          )}
           <div className="template-catalog-list" aria-busy={loading || syncing}>
             {!catalog && loading ? (
               <p className="template-empty">Cargando plantillas…</p>
@@ -326,9 +336,11 @@ export function TemplateDialog({
                       : 'Tu catálogo está vacío'}
                 </strong>
                 <p>
-                  {catalog?.canSync
-                    ? 'Usá Actualizar para traer las de Meta o probá con otro filtro.'
-                    : 'Pedile a un administrador que actualice el catálogo desde Meta.'}
+                  {catalog?.blockedReason
+                    ? 'Podés consultar las plantillas guardadas. Para traer las de Meta, primero resolvé la conexión en Canales.'
+                    : catalog?.canSync
+                      ? 'Usá Actualizar para traer las de Meta o probá con otro filtro.'
+                      : 'Pedile a un administrador que actualice el catálogo desde Meta.'}
                 </p>
                 {catalog?.canSync && (
                   <a
