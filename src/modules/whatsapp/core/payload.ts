@@ -35,6 +35,19 @@ export const valueSchema = z.object({
         video: media.optional(),
         document: media.optional(),
         sticker: media.optional(),
+        button: z
+          .object({ text: z.string().max(4096), payload: z.string().max(1024).optional() })
+          .optional(),
+        interactive: z
+          .object({
+            button_reply: z
+              .object({ id: z.string().max(1024), title: z.string().max(4096) })
+              .optional(),
+            list_reply: z
+              .object({ id: z.string().max(1024), title: z.string().max(4096) })
+              .optional(),
+          })
+          .optional(),
       }),
     )
     .max(1000)

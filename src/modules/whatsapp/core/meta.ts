@@ -32,10 +32,15 @@ export async function graphRequest(
     throw new MetaError('TEST_NETWORK_DISABLED');
   const version = process.env.WHATSAPP_GRAPH_VERSION ?? 'v25.0';
   if (!/^v(2[5-9]|[3-9]\d)\.0$/.test(version)) throw new MetaError('GRAPH_VERSION');
+  const templatePath =
+    /^\d{5,30}(?:\/message_templates)?\?fields=id,name,status,category,language,parameter_format,components(?:&limit=50(?:&after=[A-Za-z0-9%_.~-]{1,6144})?)?$/.test(
+      path,
+    );
   if (
     !/^\d{5,30}\/(messages|phone_numbers|subscribed_apps)(\?fields=id,display_phone_number,verified_name&limit=100)?$/.test(
       path,
-    )
+    ) &&
+    !templatePath
   )
     throw new MetaError('GRAPH_PATH');
   try {
@@ -169,6 +174,31 @@ export async function sendMedia(
         id: media.id,
         ...(media.type === 'document' && media.filename ? { filename: media.filename } : {}),
         ...(media.type !== 'audio' && media.caption ? { caption: media.caption } : {}),
+      },
+    },
+    callbackId,
+    transport,
+  );
+}
+
+export async function sendTemplate(
+  phoneNumberId: string,
+  token: string,
+  to: string,
+  template: { name: string; language: string; components: Record<string, unknown>[] },
+  callbackId: string,
+  transport?: MetaFetch,
+) {
+  return sendContent(
+    phoneNumberId,
+    token,
+    to,
+    {
+      type: 'template',
+      template: {
+        name: template.name,
+        language: { code: template.language },
+        ...(template.components.length ? { components: template.components } : {}),
       },
     },
     callbackId,

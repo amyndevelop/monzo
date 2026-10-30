@@ -1,3 +1,4 @@
+import type { TemplatePreview } from './template-types';
 export type Channel = {
   id: string;
   phoneNumberId: string;
@@ -30,6 +31,7 @@ export type ChatMessage = {
   occurredAt: string;
   createdAt: string;
   hasMedia: boolean;
+  template: TemplatePreview | null;
   mediaMimeType: string | null;
   mediaFilename: string | null;
   mediaSize: number | null;

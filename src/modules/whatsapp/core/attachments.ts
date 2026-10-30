@@ -1,6 +1,7 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
 import { z } from 'zod';
 import { decryptToken } from './crypto';
+import { readTemplateSnapshot } from './template-schema';
 import { withinWindow } from './payload';
 import {
   AttachmentError,
@@ -45,21 +46,18 @@ function assertSendable(conversation: Awaited<ReturnType<typeof attachmentContex
       'La ventana de 24 horas está cerrada. Esperá un nuevo mensaje del cliente.',
     );
 }
-async function consumeLimit(
+export async function consumeLimit(
   tx: Prisma.TransactionClient,
   tenantId: string,
   name: string,
   limit: number,
+  message = 'Alcanzaste el límite de archivos por minuto. Intentá más tarde.',
 ) {
   const minute = BigInt(Math.floor(Date.now() / 60000) * 60000);
   const key = `whatsapp-media:${name}:${tenantId}`;
   const previous = await tx.rateLimit.findUnique({ where: { key } });
   if (previous && previous.lastRequest === minute && previous.count >= limit)
-    throw new AttachmentError(
-      429,
-      'MEDIA_RATE_LIMIT',
-      'Alcanzaste el límite de archivos por minuto. Intentá más tarde.',
-    );
+    throw new AttachmentError(429, 'MEDIA_RATE_LIMIT', message);
   await tx.rateLimit.upsert({
     where: { key },
     create: { id: key, key, count: 1, lastRequest: minute },
@@ -218,7 +216,9 @@ export async function readAttachment(
     token,
     message.mediaId!,
     message.mediaFilename,
-    message.type,
+    message.type === 'template'
+      ? (readTemplateSnapshot(message.templateSnapshot)?.media?.kind ?? 'unknown')
+      : message.type,
     message.mediaSha256,
     transport,
   );

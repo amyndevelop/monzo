@@ -1,4 +1,4 @@
-# Controles de acceso y seguridad · Fase 3
+# Controles de acceso y seguridad · Fases 3 a 5
 
 ## Identidad y sesiones
 
@@ -72,3 +72,9 @@ La publicación solo admite destinos oficiales de Upstash, TLS verificado y sin 
 Las mutaciones de adjuntos usan multipart con origen exacto y autorización antes de leer un cuerpo acotado a 3 MiB + 32 KiB. Se validan bytes reales con file-type; el nombre/MIME del cliente no autoriza el formato. Un archivo validado no implica ausencia de malware; documentos se sirven como descarga. La cuenta y membresía se revalidan después de subir a Meta antes de guardar/encolar. La ventana, estado de cuenta y actor se comprueban de nuevo al enviar.
 
 La descarga solo acepta el ID de un mensaje de la empresa autorizada, nunca una URL o ID de medio suministrado por el navegador. Se obtiene metadato de Graph con el Phone Number ID de la cuenta; se exige HTTPS, host/ruta fija de Meta, sin credenciales en URL ni redirecciones. Se acotan bytes del stream, verifican tamaño, tipo y hashes disponibles, y se revalida acceso antes de entregar bytes. Respuestas private/no-store, nosniff, CSP y CORP; documentos descargables, nombres saneados y rangos simples para reproductores. No se revelan tokens ni URLs temporales. Límites compartidos por empresa: 10 subidas y 60 descargas/minuto. Detalles y límites de retención en `docs/phase-4.md`.
+
+## Plantillas · Fase 5
+
+El catálogo requiere membresía y conversación de la empresa; la sincronización exige Owner/Admin, origen exacto y límites por minuto. Claves compuestas vinculan plantilla, cuenta y tenant. El destinatario se obtiene del contacto autorizado; no se permite un `to` arbitrario. No se sigue `paging.next`: se construye un endpoint Graph fijo con cursor acotado/codificado. Se revalidan acceso, canal y versión después del HTTP.
+
+Los envíos guardan una instantánea validada y un hash canónico para idempotencia. Estado, definición y credencial se comprueban otra vez antes de SENDING; una plantilla cambiada/pausada no provoca un POST. Solo las plantillas aprobadas y soportadas pueden salir fuera de las 24 horas. Archivos y descargas mantienen los controles de Fase 4. Los previews usan nodos React, sin insertar HTML de Meta o del usuario. No se agregan enlaces de descarga públicos ni credenciales al cliente. Un resultado incierto no se reenvía automáticamente. Ver `docs/phase-5.md` y sus pruebas locales.

@@ -19,6 +19,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { whatsappRequest } from './http';
 import { MessageAttachment } from './message-attachment';
+import { TemplateDialog } from './template-dialog';
+import { TemplatePreview } from './template-preview';
 import { InboxNavigationToggle } from '@/components/platform/inbox-navigation';
 import { MEDIA_ACCEPT, MAX_MEDIA_BYTES, mediaSizeLabel } from '@/modules/whatsapp/media-policy';
 import type { ChatSummary, ChatThread, ChatMessage, Channels } from '@/modules/whatsapp/types';
@@ -32,6 +34,19 @@ const labels: Record<string, string> = {
   UNKNOWN: 'Envío sin confirmar',
   CANCELED: 'Cancelado',
   RECEIVED: 'Recibido',
+};
+const errorLabels: Record<string, string> = {
+  TEMPLATE_NOT_APPROVED:
+    'Meta pausó o dejó de aprobar esta plantilla. Elegí otra o actualizá el catálogo.',
+  TEMPLATE_CHANGED:
+    'La plantilla cambió. Abrí el selector y revisá la versión actual antes de enviar.',
+  TEMPLATE_UNAVAILABLE: 'No pudimos comprobar la plantilla en Meta. Revisá el canal y el catálogo.',
+  TEMPLATE_UNSUPPORTED: 'El formato de esta plantilla todavía no está disponible en la bandeja.',
+  TEMPLATE_PARAMETERS: 'Los datos de la plantilla no son válidos. Revisalos antes de otro envío.',
+  MEMBERSHIP_REVOKED: 'El operador ya no tiene acceso a esta empresa.',
+  CREDENTIALS_UNAVAILABLE: 'Actualizá la autorización del canal en Canales.',
+  ACCOUNT_DISABLED: 'El canal está desconectado. Revisá su autorización en Canales.',
+  META_190: 'La autorización de Meta venció o fue revocada. Actualizala en Canales.',
 };
 function time(value: string) {
   return new Date(value).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
@@ -69,6 +84,7 @@ export function Inbox({
   const [status, setStatus] = useState('OPEN');
   const [error, setError] = useState('');
   const [sending, setSending] = useState(false);
+  const [templateOpen, setTemplateOpen] = useState(false);
   const [draft, setDraft] = useState('');
   const [attachment, setAttachment] = useState<File | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -103,6 +119,7 @@ export function Inbox({
   function selectConversation(id: string | null) {
     selectedRef.current = id;
     setSelected(id);
+    setTemplateOpen(false);
     setThread(null);
     setDraft('');
     clearAttachment();
@@ -442,7 +459,13 @@ export function Inbox({
                   {['image', 'audio', 'video', 'document', 'sticker'].includes(message.type) && (
                     <MessageAttachment tenantId={tenantId} message={message} />
                   )}
-                  {message.text ? (
+                  {message.template ? (
+                    <TemplatePreview
+                      preview={message.template}
+                      tenantId={tenantId}
+                      message={message}
+                    />
+                  ) : message.text ? (
                     <p>{message.text}</p>
                   ) : message.type === 'text' ? (
                     <p>Mensaje sin texto</p>
@@ -468,7 +491,11 @@ export function Inbox({
                       envío.
                     </small>
                   )}
-                  {message.errorCode && <small>{message.errorCode}</small>}
+                  {message.errorCode && (
+                    <small title={message.errorCode}>
+                      {errorLabels[message.errorCode] ?? message.errorCode}
+                    </small>
+                  )}
                 </article>
               ))}
             </div>
@@ -563,10 +590,15 @@ export function Inbox({
                 </button>
               </div>
               {mode === 'message' && !openWindow ? (
-                <p className="closed-window-copy">
-                  Para responder necesitamos un mensaje del cliente en las últimas 24 horas. Las
-                  plantillas se incorporarán después.
-                </p>
+                <div className="closed-window-copy">
+                  <p>
+                    Pasaron más de 24 horas. Usá una plantilla aprobada para retomar la
+                    conversación.
+                  </p>
+                  <Button type="button" variant="outline" onClick={() => setTemplateOpen(true)}>
+                    <FileText size={16} /> Elegir plantilla
+                  </Button>
+                </div>
               ) : (
                 <>
                   {mode === 'message' && (
@@ -642,6 +674,18 @@ export function Inbox({
                     {mode === 'message' && (
                       <button
                         type="button"
+                        className="composer-icon"
+                        aria-label="Usar plantilla"
+                        title="Usar una plantilla de WhatsApp"
+                        disabled={sending}
+                        onClick={() => setTemplateOpen(true)}
+                      >
+                        <FileText size={21} />
+                      </button>
+                    )}
+                    {mode === 'message' && (
+                      <button
+                        type="button"
                         className="composer-icon composer-clip"
                         aria-label="Adjuntar archivo"
                         title="Adjuntar archivo · Hasta 3 MB"
@@ -714,6 +758,19 @@ export function Inbox({
               )}
             </form>
           </>
+        )}
+        {templateOpen && selected && thread && (
+          <TemplateDialog
+            key={selected}
+            base={`${base}/conversations/${selected}`}
+            contactName={thread.conversation.contact.name ?? '+' + thread.conversation.contact.waId}
+            onClose={() => setTemplateOpen(false)}
+            onSent={() => {
+              void refreshThread().catch(() =>
+                setError('La plantilla quedó guardada. Actualizá el chat para ver su estado.'),
+              );
+            }}
+          />
         )}
         {error && (
           <p role="alert" className="form-error inbox-error">

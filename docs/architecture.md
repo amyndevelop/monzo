@@ -1,4 +1,4 @@
-# Arquitectura · Fases 3 y 4
+# Arquitectura · Fases 3 a 5
 
 Monolito modular Next.js App Router, TypeScript estricto, Prisma 6.19.3 y PostgreSQL 17. React Server Components para obtener datos autorizados y componentes cliente para formularios y navegación. Inter se sirve localmente. Tailwind 4, shadcn/ui y Lucide conservan la identidad Cloud.
 
@@ -59,3 +59,9 @@ Compose sirve únicamente para desarrollo y pruebas locales, con volúmenes y pu
 La quinta migración agrega metadatos opcionales de archivo a Message. La bandeja expone únicamente disponibilidad y metadatos; los bytes se obtienen con autorización por mensaje/empresa y se cargan a pedido. Las subidas multipart se validan por contenido y tamaño antes de llamar al endpoint de medios de la cuenta en Graph. No se mantiene un bloqueo de PostgreSQL durante HTTP: se revalida acceso/canal/ventana al guardar y al enviar. La idempotencia permite archivos sobrantes en Meta tras una carrera o fallo, pero no mensajes salientes duplicados.
 
 Meta conserva el archivo; PostgreSQL guarda ID, MIME, nombre, tamaño y hash. No se agrega almacenamiento de objetos ni se encolan bytes. La descarga renueva el enlace de Meta, exige host/ruta HTTPS fijos sin redirecciones, comprueba tamaño/hash/tipo y vuelve a validar membresía antes de responder. La UI usa object URLs locales y conserva la selección/clave al fallar la programación. La disponibilidad depende de la retención del proveedor; no se promete archivo permanente. Ver `docs/phase-4.md` para formatos, límites y publicación antes/después de migrar Neon.
+
+## Plantillas · Fase 5
+
+La sexta migración agrega WhatsappTemplate por cuenta/empresa y una instantánea inmutable en Message. La sincronización explícita pagina Graph de a 50, con cursor validado y versión para rechazar escrituras obsoletas. La UI consulta el catálogo local y presenta variables y vista previa en el chat. Los encabezados de archivo reutilizan el transporte privado de adjuntos. No se añade proveedor ni secreto.
+
+El worker consulta estado y definición en Meta antes de reclamar una plantilla. Revalida membresía, cuenta, WABA, versión de credencial y hash bajo bloqueo; entonces usa el transporte de mensajes existente. El bypass de ventana corresponde exclusivamente al tipo template validado; texto/medios mantienen las 24 horas. La instantánea conserva el historial aunque cambie el catálogo. Ver `docs/phase-5.md` para formatos, permisos, límites y actualización previa de Neon.

@@ -130,7 +130,12 @@ export async function processWebhook(db: PrismaClient, eventId: string) {
               direction: 'INBOUND',
               status: 'RECEIVED',
               type: message.type,
-              text: message.text?.body ?? media?.caption,
+              text:
+                message.text?.body ??
+                media?.caption ??
+                message.button?.text ??
+                message.interactive?.button_reply?.title ??
+                message.interactive?.list_reply?.title,
               mediaId: media?.id,
               mediaMimeType: media?.mime_type,
               mediaFilename: media?.filename,

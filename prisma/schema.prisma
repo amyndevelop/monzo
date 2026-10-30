@@ -44,6 +44,7 @@ model Tenant {
   messages          Message[]
   webhookEvents     WhatsappWebhookEvent[]
   conversationNotes ConversationNote[]
+  whatsappTemplates WhatsappTemplate[]
 }
 
 model Membership {
@@ -159,23 +160,28 @@ enum ConversationStatus {
 }
 
 model WhatsappAccount {
-  id                String                 @id @default(cuid())
-  tenantId          String
-  tenant            Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  phoneNumberId     String                 @unique
-  businessAccountId String
-  displayPhone      String
-  displayName       String
-  tokenEncrypted    String?
-  enabled           Boolean                @default(false)
-  lastErrorCode     String?
-  verifiedAt        DateTime?
-  createdAt         DateTime               @default(now())
-  updatedAt         DateTime               @updatedAt
-  contacts          Contact[]
-  conversations     Conversation[]
-  messages          Message[]
-  webhookEvents     WhatsappWebhookEvent[]
+  id                   String                 @id @default(cuid())
+  tenantId             String
+  tenant               Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  phoneNumberId        String                 @unique
+  businessAccountId    String
+  displayPhone         String
+  displayName          String
+  tokenEncrypted       String?
+  enabled              Boolean                @default(false)
+  lastErrorCode        String?
+  verifiedAt           DateTime?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  templatesSyncedAt    DateTime?
+  templatesNextCursor  String?
+  templatesSyncId      String?
+  templatesSyncVersion Int                    @default(0)
+  contacts             Contact[]
+  conversations        Conversation[]
+  messages             Message[]
+  webhookEvents        WhatsappWebhookEvent[]
+  templates            WhatsappTemplate[]
 
   @@unique([id, tenantId])
   @@index([tenantId])
@@ -225,32 +231,35 @@ model Conversation {
 }
 
 model Message {
-  id              String           @id @default(cuid())
-  tenantId        String
-  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  accountId       String
-  account         WhatsappAccount  @relation(fields: [accountId, tenantId], references: [id, tenantId], onDelete: Restrict)
-  conversationId  String
-  conversation    Conversation     @relation(fields: [conversationId, accountId, tenantId], references: [id, accountId, tenantId], onDelete: Restrict)
-  direction       MessageDirection
-  status          MessageStatus
-  type            String
-  text            String?
-  mediaId         String?
-  mediaMimeType   String?
-  mediaFilename   String?
-  mediaSize       Int?
-  mediaSha256     String?
-  providerId      String?
-  idempotencyKey  String?
-  createdByUserId String?
-  createdByUser   User?            @relation("MessageAuthor", fields: [createdByUserId], references: [id], onDelete: Restrict)
-  errorCode       String?
-  attemptedAt     DateTime?
-  jobPublishedAt  DateTime?
-  occurredAt      DateTime
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  id               String            @id @default(cuid())
+  tenantId         String
+  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  accountId        String
+  account          WhatsappAccount   @relation(fields: [accountId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  conversationId   String
+  conversation     Conversation      @relation(fields: [conversationId, accountId, tenantId], references: [id, accountId, tenantId], onDelete: Restrict)
+  direction        MessageDirection
+  status           MessageStatus
+  type             String
+  text             String?
+  mediaId          String?
+  mediaMimeType    String?
+  mediaFilename    String?
+  mediaSize        Int?
+  mediaSha256      String?
+  templateId       String?
+  templateSnapshot Json?
+  template         WhatsappTemplate? @relation(fields: [templateId, accountId, tenantId], references: [id, accountId, tenantId], onDelete: Restrict)
+  providerId       String?
+  idempotencyKey   String?
+  createdByUserId  String?
+  createdByUser    User?             @relation("MessageAuthor", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  errorCode        String?
+  attemptedAt      DateTime?
+  jobPublishedAt   DateTime?
+  occurredAt       DateTime
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
 
   @@unique([accountId, providerId])
   @@unique([tenantId, idempotencyKey])
@@ -270,6 +279,32 @@ model ConversationNote {
   createdAt      DateTime     @default(now())
 
   @@index([tenantId, conversationId, createdAt])
+}
+
+model WhatsappTemplate {
+  id                String          @id @default(cuid())
+  tenantId          String
+  tenant            Tenant          @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  accountId         String
+  account           WhatsappAccount @relation(fields: [accountId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  businessAccountId String
+  providerId        String
+  name              String
+  language          String
+  category          String
+  status            String
+  definition        Json
+  definitionHash    String
+  syncId            String
+  syncedAt          DateTime        @default(now())
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  messages          Message[]
+
+  @@unique([id, accountId, tenantId])
+  @@unique([accountId, providerId])
+  @@unique([accountId, name, language])
+  @@index([tenantId, accountId, status])
 }
 
 model WhatsappWebhookEvent {
