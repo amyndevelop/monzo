@@ -1,6 +1,6 @@
 # Fase 4 · Adjuntos de WhatsApp
 
-Estado: implementada en `feat/phase-4-whatsapp-media`, pendiente de aplicar la quinta migración en Neon y publicar. Fase 3 ya está funcionando en producción: el usuario confirmó recepción y respuesta real y luego sustituyó el token temporal por un token de usuario del sistema. No se leyó la credencial ni se verificó su fecha de vencimiento desde este entorno.
+Estado: implementada en `163d086` e integrada en `main` para publicación. El usuario ejecutó el SQL de Fase 4 y confirmó **neondb | 4 | 5**. La migración de producción quedó verificada por ese resultado; falta comprobar Ready en Vercel y adjuntos reales. Fase 3 ya está funcionando en producción: el usuario confirmó recepción y respuesta real y luego sustituyó el token temporal por un token de usuario del sistema. No se leyó la credencial ni se verificó su fecha de vencimiento desde este entorno.
 
 ## Alcance
 
@@ -41,4 +41,4 @@ La migración `202610300001_whatsapp_media` agrega cuatro columnas nulas a Messa
 
 `tests/media.spec.ts` cubre formatos con fixtures reales de audio/video, límites, hash, URL/host de descarga, multipart, concurrencia, idempotencia, revocación durante HTTP, aislamiento entre empresas, payloads de Meta, variante argentina, carga a pedido, descargas y reproducción en escritorio/móvil. La API real rechaza red externa en monzo_test; los contratos positivos de Meta usan transportes explícitos, y la UI recibe archivos de fixtures mediante una ruta interceptada identificada en la prueba. No se presentan esas pruebas como entrega real externa de adjuntos.
 
-Ejecutar `npm run build`, `npm test` y `npm run test:qstash`. Las pruebas de Fase 3 y autenticación continúan activas. Los resultados finales de esta entrega se registran en `docs/progress.md`. No se ha aplicado la migración de producción ni confirmado envío/descarga de adjuntos reales.
+Ejecutar `npm run build`, `npm test` y `npm run test:qstash`. Las pruebas de Fase 3 y autenticación continúan activas. Los resultados finales de esta entrega se registran en `docs/progress.md`. El usuario confirmó la migración de producción con neondb | 4 | 5; todavía no confirmó envío/descarga de adjuntos reales.

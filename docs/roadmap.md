@@ -14,9 +14,9 @@ Publicada desde main tras configurar Neon, Resend y secretos en Vercel. El usuar
 
 Cloud API oficial, webhook firmado, recepción idempotente, contactos, bandeja, respuestas de texto, estados y colaboración humana. Publicada en Vercel con QStash por eventos, sin worker permanente ni Redis remoto. El usuario confirmó recepción y envío reales con el número de prueba, corrigió el destinatario argentino y sustituyó el token temporal por uno de usuario del sistema. El número comercial permanece sin migrar. Ver `docs/phase-3.md`.
 
-## Fase 4 · Adjuntos — desarrollo autorizado
+## Fase 4 · Adjuntos — código integrado; validación de producción pendiente
 
-El usuario autorizó continuar el desarrollo de la siguiente fase tras revisar su alcance. Se implementan imágenes, audio, video y documentos, con apertura/descarga privada y envío por la cola actual. Usa almacenamiento de Meta y un límite de 3 MiB por archivo, sin servicios adicionales. Pendiente de migrar/publicar y probar adjuntos en producción. Ver `docs/phase-4.md`.
+El usuario autorizó continuar el desarrollo de la siguiente fase tras revisar su alcance. Se implementaron imágenes, audio, video y documentos, con apertura/descarga privada y envío por la cola actual. Usa almacenamiento de Meta y un límite de 3 MiB por archivo, sin servicios adicionales. El usuario confirmó la migración de Neon con neondb | 4 | 5. Código integrado en main para publicación; pendientes Ready y prueba de adjuntos en producción. Ver `docs/phase-4.md`.
 
 ## Fases posteriores · Por definir y autorizar
 
