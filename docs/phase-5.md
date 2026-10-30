@@ -1,6 +1,6 @@
 # Fase 5 · Plantillas de WhatsApp
 
-Implementación en `feat/phase-5-whatsapp-templates`. Pendiente de aplicar la sexta migración en Neon, integrar en main y validar con Meta real. No se afirma publicación ni entrega externa a partir de los contratos locales.
+Implementación `932a890`, integrada para despliegue desde main tras la confirmación del usuario de **neondb | 1 | 2 | 4 | 6**. La sexta migración de Neon ya fue confirmada por el usuario; no se consultó la base desde este entorno. Pendiente confirmar Ready de Vercel y sincronización/envío con Meta real. No se afirma entrega externa a partir de los contratos locales.
 
 ## Recorrido y UX/UI
 

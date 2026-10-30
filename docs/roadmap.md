@@ -18,9 +18,9 @@ Cloud API oficial, webhook firmado, recepción idempotente, contactos, bandeja, 
 
 El usuario autorizó continuar el desarrollo de la siguiente fase tras revisar su alcance. Se implementaron imágenes, audio, video y documentos, con apertura/descarga privada y envío por la cola actual. Usa almacenamiento de Meta y un límite de 3 MiB por archivo, sin servicios adicionales. El usuario confirmó la migración de Neon con neondb | 4 | 5. Publicada mediante 4f0e20e; el usuario confirmó que los adjuntos funcionan en producción. Se ajusta la presentación del chat a su pedido. Ver `docs/phase-4.md`.
 
-## Fase 5 · Plantillas — desarrollada, pendiente de migración/publicación
+## Fase 5 · Plantillas — integrada para despliegue
 
-El usuario autorizó esta fase y estableció UX/UI como requisito permanente. Catálogo por cuenta sincronizado con Meta, selección dentro del chat, variables, vista previa, encabezados de archivo y envío fuera de las 24 horas con validación previa. Sexta migración aditiva preparada para Neon. No se integra main hasta confirmar neondb | 1 | 2 | 4 | 6. Ver `docs/phase-5.md`.
+El usuario autorizó esta fase y estableció UX/UI como requisito permanente. Catálogo por cuenta sincronizado con Meta, selección dentro del chat, variables, vista previa, encabezados de archivo y envío fuera de las 24 horas con validación previa. El usuario confirmó la sexta migración de Neon con neondb | 1 | 2 | 4 | 6. Implementación integrada para despliegue desde main; pendientes Ready de Vercel y prueba real del catálogo/envío. Ver `docs/phase-5.md`.
 
 ## Fases posteriores · Por definir y autorizar
 
