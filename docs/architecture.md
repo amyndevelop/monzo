@@ -1,4 +1,4 @@
-# Arquitectura · Fase 3
+# Arquitectura · Fases 3 y 4
 
 Monolito modular Next.js App Router, TypeScript estricto, Prisma 6.19.3 y PostgreSQL 17. React Server Components para obtener datos autorizados y componentes cliente para formularios y navegación. Inter se sirve localmente. Tailwind 4, shadcn/ui y Lucide conservan la identidad Cloud.
 
@@ -53,3 +53,9 @@ La cuarta migración agrega `jobPublishedAt` a eventos y mensajes. La web espera
 ## Entornos
 
 Compose sirve únicamente para desarrollo y pruebas locales, con volúmenes y puertos separados. El runner restringe la base de pruebas a la instancia local monzo_test en el puerto 55433. En Vercel se requieren PostgreSQL gestionado, SMTP y secretos propios de cada entorno. La autenticación nunca usa una contraseña de muestra como sustituto de configuración faltante. La rama de desarrollo no se envía a `main` automáticamente.
+
+## Adjuntos · Fase 4
+
+La quinta migración agrega metadatos opcionales de archivo a Message. La bandeja expone únicamente disponibilidad y metadatos; los bytes se obtienen con autorización por mensaje/empresa y se cargan a pedido. Las subidas multipart se validan por contenido y tamaño antes de llamar al endpoint de medios de la cuenta en Graph. No se mantiene un bloqueo de PostgreSQL durante HTTP: se revalida acceso/canal/ventana al guardar y al enviar. La idempotencia permite archivos sobrantes en Meta tras una carrera o fallo, pero no mensajes salientes duplicados.
+
+Meta conserva el archivo; PostgreSQL guarda ID, MIME, nombre, tamaño y hash. No se agrega almacenamiento de objetos ni se encolan bytes. La descarga renueva el enlace de Meta, exige host/ruta HTTPS fijos sin redirecciones, comprueba tamaño/hash/tipo y vuelve a validar membresía antes de responder. La UI usa object URLs locales y conserva la selección/clave al fallar la programación. La disponibilidad depende de la retención del proveedor; no se promete archivo permanente. Ver `docs/phase-4.md` para formatos, límites y publicación antes/después de migrar Neon.

@@ -86,11 +86,11 @@ export async function verifyAndSubscribe(
     displayName: String(phone.verified_name ?? 'WhatsApp Business').slice(0, 120),
   };
 }
-export async function sendText(
+async function sendContent(
   phoneNumberId: string,
   token: string,
   to: string,
-  text: string,
+  content: Record<string, unknown>,
   callbackId: string,
   transport?: MetaFetch,
 ) {
@@ -103,8 +103,7 @@ export async function sendText(
         messaging_product: 'whatsapp',
         recipient_type: 'individual',
         to: recipient,
-        type: 'text',
-        text: { preview_url: false, body: text },
+        ...content,
         biz_opaque_callback_data: callbackId,
       },
       transport,
@@ -131,4 +130,48 @@ export async function sendText(
       return send('54' + to.slice(3));
     throw error;
   }
+}
+
+export async function sendText(
+  phoneNumberId: string,
+  token: string,
+  to: string,
+  text: string,
+  callbackId: string,
+  transport?: MetaFetch,
+) {
+  return sendContent(
+    phoneNumberId,
+    token,
+    to,
+    { type: 'text', text: { preview_url: false, body: text } },
+    callbackId,
+    transport,
+  );
+}
+export async function sendMedia(
+  phoneNumberId: string,
+  token: string,
+  to: string,
+  media: { type: string; id: string; filename?: string | null; caption?: string | null },
+  callbackId: string,
+  transport?: MetaFetch,
+) {
+  if (!['image', 'audio', 'video', 'document'].includes(media.type) || !/^\d{5,30}$/.test(media.id))
+    throw new MetaError('MEDIA_UNAVAILABLE');
+  return sendContent(
+    phoneNumberId,
+    token,
+    to,
+    {
+      type: media.type,
+      [media.type]: {
+        id: media.id,
+        ...(media.type === 'document' && media.filename ? { filename: media.filename } : {}),
+        ...(media.type !== 'audio' && media.caption ? { caption: media.caption } : {}),
+      },
+    },
+    callbackId,
+    transport,
+  );
 }

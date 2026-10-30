@@ -1,6 +1,6 @@
 # Fase 3 · WhatsApp Cloud API y bandeja
 
-Estado: código integrado y subido a `main` en `a3083f9`, seguido por ajustes de autocompletado y configuración QStash (`15f5f87`, `99d7025`). El usuario confirmó el esquema de producción, autorización del número y recepción real en MONZO. El envío fue rechazado primero por credencial temporal (`META_190`) y, tras renovarla, por destinatario de prueba (`META_131030`). Meta tiene autorizado el formato argentino `54` + número nacional, mientras el webhook identifica el contacto como `549` + número nacional. El ajuste descrito abajo admite esa variante; todavía falta comprobar una respuesta de MONZO recibida en el teléfono.
+Estado: publicada en `main`, incluido el ajuste de destinatario argentino `5021ec3`. El usuario confirmó recepción y respuestas reales de MONZO recibidas en su teléfono. Luego generó un token de usuario del sistema, lo guardó en Canales y confirmó funcionamiento. No se leyó su valor ni se verificó desde este entorno si eligió vencimiento Nunca. Esta evidencia corresponde a texto con el número de prueba de Meta; los adjuntos se desarrollan en [Fase 4](phase-4.md).
 
 ## Ruta sin servidor permanente · Vercel + QStash
 
@@ -135,5 +135,5 @@ El webhook responde 503 si falla la persistencia para que Meta pueda reintentar.
 - Se conservan tipo, ID y leyenda de medios recibidos; no se descargan archivos ni se habilitan adjuntos salientes.
 - Actualización por polling de cuatro/cinco segundos; no WebSockets. Listas de contactos/conversaciones acotadas a 100, historial por páginas de 50, últimas 50 notas y primeros 100 números de una WABA durante autorización.
 - No hay sincronización de historial previo, coexistencia implementada, Embedded Signup ni proceso de revisión de app para clientes externos.
-- El usuario confirmó autorización real contra Meta y recepción en MONZO con el modo QStash de Vercel. Falta confirmar una respuesta de MONZO recibida en el teléfono. Las pruebas automatizadas de contratos usan transportes explícitos; no establecen entrega externa. No se configuró Redis remoto ni un alojamiento permanente.
+- El usuario confirmó autorización real contra Meta, recepción y respuestas de texto desde MONZO con el modo QStash de Vercel. Las pruebas automatizadas de contratos usan transportes explícitos; no establecen entrega externa. No se configuró Redis remoto ni un alojamiento permanente.
 - No hay IA, automatizaciones, CRM, cobros o analíticas operativas en esta entrega.

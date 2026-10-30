@@ -8,8 +8,11 @@ export async function whatsappRequest<T>(
   const response = await fetch(path, {
     method,
     cache: 'no-store',
-    headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
-    body: body === undefined ? undefined : JSON.stringify(body),
+    headers:
+      body === undefined || body instanceof FormData
+        ? undefined
+        : { 'Content-Type': 'application/json' },
+    body: body instanceof FormData ? body : body === undefined ? undefined : JSON.stringify(body),
     signal,
   });
   const data = await response.json();

@@ -6,6 +6,7 @@ import { requireTenantAccess, AccessError } from '@/modules/access/policy';
 import { RequestError, idSchema } from '@/modules/tenants/http';
 import { encryptToken, whatsappConfigured } from './core/crypto';
 import { verifyAndSubscribe, MetaError } from './core/meta';
+import { messageFields, presentMessage } from './core/message';
 import { withinWindow } from './core/payload';
 import { dispatchJobs, processorMode, qstashConfigurationIssues } from './core/qstash';
 const accountFields = {
@@ -18,16 +19,6 @@ const accountFields = {
   verifiedAt: true,
   lastErrorCode: true,
   createdAt: true,
-} as const;
-const messageFields = {
-  id: true,
-  direction: true,
-  status: true,
-  type: true,
-  text: true,
-  occurredAt: true,
-  createdAt: true,
-  errorCode: true,
 } as const;
 export async function channelStatus(tenantId: string) {
   const { membership } = await requireTenantAccess(idSchema.parse(tenantId));
@@ -267,7 +258,12 @@ export async function listConversations(tenantId: string, params: URLSearchParam
     orderBy: [{ lastMessageAt: 'desc' }, { id: 'desc' }],
     take: 101,
   });
-  return { items: items.slice(0, 100), hasMore: items.length > 100 };
+  return {
+    items: items
+      .slice(0, 100)
+      .map((item) => ({ ...item, messages: item.messages.map(presentMessage) })),
+    hasMore: items.length > 100,
+  };
 }
 async function scopedConversation(tenantId: string, conversationId: string) {
   const access = await requireTenantAccess(tenantId);
@@ -333,7 +329,7 @@ export async function getThread(tenantId: string, conversationId: string, before
       account: conversation.account,
       unreadCount: conversation.unreadCount,
     },
-    messages: messages.slice(0, 50).reverse(),
+    messages: messages.slice(0, 50).reverse().map(presentMessage),
     hasMore: messages.length > 50,
     notes,
     members,
@@ -362,7 +358,11 @@ export async function enqueueMessage(tenantId: string, conversationId: string, i
       select: { ...messageFields, conversationId: true },
     });
     if (existing) {
-      if (existing.conversationId !== conversationId || existing.text !== text)
+      if (
+        existing.conversationId !== conversationId ||
+        existing.text !== text ||
+        existing.type !== 'text'
+      )
         throw new RequestError(409, 'La clave de envío ya se usó para otro mensaje.');
       return existing;
     }
@@ -415,7 +415,7 @@ export async function enqueueMessage(tenantId: string, conversationId: string, i
       );
     }
   }
-  return saved;
+  return presentMessage(saved);
 }
 export async function updateConversation(tenantId: string, conversationId: string, input: unknown) {
   const { user } = await scopedConversation(tenantId, conversationId);

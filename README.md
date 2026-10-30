@@ -1,6 +1,6 @@
-# MONZO · Fase 3 en desarrollo
+# MONZO · Fase 4 en desarrollo
 
-Plataforma SaaS en desarrollo. Landing comercial, demo pública y acceso real por cuenta verificada a espacios independientes de empresa. Las Fases 1 y 2 están publicadas. Esta rama prepara WhatsApp y la bandeja, todavía sin despliegue ni conexión real a Meta. El push autorizado a main activa el despliegue automático de Vercel; el estado y los flujos reales de producción se verifican por separado.
+Plataforma SaaS en desarrollo. Landing comercial, demo pública y acceso por cuenta verificada a espacios independientes de empresa. Las Fases 1, 2 y 3 están publicadas: el usuario confirmó recepción y respuesta de texto con Meta real mediante Vercel/QStash. Esta rama agrega adjuntos; requiere aplicar primero la quinta migración de Neon. Ver [Fase 4](docs/phase-4.md). El push autorizado a main activa el despliegue automático de Vercel; los flujos de producción se verifican por separado.
 
 ## Desarrollo local
 
@@ -35,7 +35,7 @@ Abrir el sitio local en el origen exacto de `BETTER_AUTH_URL`, inicialmente `htt
 | `/dashboard/configuracion`             | Preferencias; propietarios y administradores pueden modificar         |
 | `/invitacion`                          | Aceptación explícita con cuenta del correo invitado, verificada       |
 
-Esta rama agrega `/dashboard/canales`, `/dashboard/conversaciones`, `/dashboard/contactos` y `/api/webhooks/whatsapp`. La integración requiere una app real de Meta y un procesador configurado (QStash por eventos o worker BullMQ); `setup:local` no simula una conexión. IA, plantillas, CRM, pagos y automatizaciones siguen pendientes. Ver [Fase 3](docs/phase-3.md).
+La Fase 3 agrega `/dashboard/canales`, `/dashboard/conversaciones`, `/dashboard/contactos` y `/api/webhooks/whatsapp`. La Fase 4 extiende esa bandeja con adjuntos privados y requiere primero la migración 5; ver [operación y publicación de adjuntos](docs/phase-4.md). La integración requiere una app real de Meta y un procesador configurado (QStash por eventos o worker BullMQ); `setup:local` no simula una conexión. IA, plantillas, CRM, pagos y automatizaciones siguen pendientes. Ver [Fase 3](docs/phase-3.md).
 
 Compose incluye Redis 7 con contraseña en `127.0.0.1:6379`, DB 0 para desarrollo y DB 1 para pruebas. Para procesar mensajes de desarrollo, abrir otra terminal en este directorio y ejecutar `npm run worker`. Web y worker comparten base y clave de cifrado. Con `WHATSAPP_PROCESSOR=qstash`, Vercel ejecuta los trabajos mediante callbacks firmados y no hace falta Redis ni proceso permanente. Esta es la ruta elegida para las pruebas con presupuesto gratuito; confirmar plan/cuotas Free en Upstash. El modo BullMQ permanece disponible para desarrollo o un servidor propio. `Dockerfile.worker` crea la imagen de producción sin archivos de secretos, con usuario sin privilegios y comprobación de salud.
 

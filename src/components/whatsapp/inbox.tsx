@@ -11,9 +11,13 @@ import {
   Clock3,
   AlertCircle,
   UserRound,
+  Paperclip,
+  X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { whatsappRequest } from './http';
+import { MessageAttachment } from './message-attachment';
+import { MEDIA_ACCEPT, MAX_MEDIA_BYTES, mediaSizeLabel } from '@/modules/whatsapp/media-policy';
 import type { ChatSummary, ChatThread, ChatMessage, Channels } from '@/modules/whatsapp/types';
 const labels: Record<string, string> = {
   QUEUED: 'En cola',
@@ -63,6 +67,8 @@ export function Inbox({
   const [error, setError] = useState('');
   const [sending, setSending] = useState(false);
   const [draft, setDraft] = useState('');
+  const [attachment, setAttachment] = useState<File | null>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
   const [mode, setMode] = useState<'message' | 'note'>('message');
   const [listLoaded, setListLoaded] = useState(false);
   const [hasMore, setHasMore] = useState(false);
@@ -74,6 +80,7 @@ export function Inbox({
     setSelected(id);
     setThread(null);
     setDraft('');
+    setAttachment(null);
     nonce.current = null;
   }
   useEffect(() => {
@@ -196,6 +203,10 @@ export function Inbox({
     }
   }
   const openWindow = Boolean(thread?.canReply);
+  const audioAttachment = Boolean(
+    attachment &&
+    (attachment.type.startsWith('audio/') || /\.(mp3|ogg|m4a|aac)$/i.test(attachment.name)),
+  );
   return (
     <div className={`inbox ${selected ? 'inbox-has-selection' : ''}`}>
       <aside className="inbox-list">
@@ -243,6 +254,7 @@ export function Inbox({
             items.map((item) => (
               <button
                 key={item.id}
+                disabled={sending}
                 className={`conversation-preview ${selected === item.id ? 'selected' : ''}`}
                 onClick={() => {
                   selectConversation(item.id);
@@ -399,12 +411,16 @@ export function Inbox({
                   className={`chat-bubble ${message.direction === 'OUTBOUND' ? 'outgoing' : 'incoming'}`}
                   key={message.id}
                 >
-                  {message.type !== 'text' && (
-                    <span className="media-limitation">
-                      {message.type} · archivo sin vista previa en esta fase
-                    </span>
+                  {['image', 'audio', 'video', 'document', 'sticker'].includes(message.type) && (
+                    <MessageAttachment tenantId={tenantId} message={message} />
                   )}
-                  <p>{messageText(message)}</p>
+                  {message.text ? (
+                    <p>{message.text}</p>
+                  ) : message.type === 'text' ? (
+                    <p>Mensaje sin texto</p>
+                  ) : !['image', 'audio', 'video', 'document', 'sticker'].includes(message.type) ? (
+                    <p>{messageText(message)}</p>
+                  ) : null}
                   <footer>
                     <time dateTime={message.occurredAt}>{time(message.occurredAt)}</time>
                     {message.direction === 'OUTBOUND' && (
@@ -449,7 +465,8 @@ export function Inbox({
               className={`message-composer ${mode === 'note' ? 'note-composer' : ''}`}
               onSubmit={async (event) => {
                 event.preventDefault();
-                if (!selected || sending || !draft.trim()) return;
+                if (!selected || sending || (!draft.trim() && !(mode === 'message' && attachment)))
+                  return;
                 setSending(true);
                 setError('');
                 try {
@@ -459,12 +476,24 @@ export function Inbox({
                     });
                   else {
                     nonce.current ??= crypto.randomUUID();
-                    await whatsappRequest(`${base}/conversations/${selected}/messages`, 'POST', {
-                      text: draft,
-                      idempotencyKey: nonce.current,
-                    });
+                    if (attachment) {
+                      const form = new FormData();
+                      form.set('file', attachment);
+                      form.set('text', draft);
+                      form.set('idempotencyKey', nonce.current);
+                      await whatsappRequest(
+                        `${base}/conversations/${selected}/attachments`,
+                        'POST',
+                        form,
+                      );
+                    } else
+                      await whatsappRequest(`${base}/conversations/${selected}/messages`, 'POST', {
+                        text: draft,
+                        idempotencyKey: nonce.current,
+                      });
                   }
                   setDraft('');
+                  setAttachment(null);
                   nonce.current = null;
                   await refreshThread();
                 } catch (error) {
@@ -479,10 +508,12 @@ export function Inbox({
               <div className="composer-tabs">
                 <button
                   type="button"
+                  disabled={sending}
                   aria-pressed={mode === 'message'}
                   onClick={() => {
                     setMode('message');
                     setDraft('');
+                    setAttachment(null);
                     nonce.current = null;
                   }}
                 >
@@ -490,10 +521,12 @@ export function Inbox({
                 </button>
                 <button
                   type="button"
+                  disabled={sending}
                   aria-pressed={mode === 'note'}
                   onClick={() => {
                     setMode('note');
                     setDraft('');
+                    setAttachment(null);
                     nonce.current = null;
                   }}
                 >
@@ -502,8 +535,8 @@ export function Inbox({
               </div>
               {mode === 'message' && !openWindow ? (
                 <p className="closed-window-copy">
-                  Para responder con texto necesitamos un mensaje del cliente en las últimas 24
-                  horas. Las plantillas se incorporarán después.
+                  Para responder necesitamos un mensaje del cliente en las últimas 24 horas. Las
+                  plantillas se incorporarán después.
                 </p>
               ) : (
                 <>
@@ -513,8 +546,8 @@ export function Inbox({
                   <textarea
                     id="chat-draft"
                     value={draft}
-                    maxLength={mode === 'note' ? 2000 : 4096}
-                    disabled={sending}
+                    maxLength={mode === 'note' ? 2000 : attachment ? 1024 : 4096}
+                    disabled={sending || audioAttachment}
                     onChange={(event) => {
                       setDraft(event.target.value);
                       nonce.current = null;
@@ -522,16 +555,94 @@ export function Inbox({
                     placeholder={
                       mode === 'note'
                         ? 'Solo tu equipo podrá ver esta nota…'
-                        : 'Escribí tu respuesta…'
+                        : audioAttachment
+                          ? 'Audio seleccionado. Se envía sin leyenda.'
+                          : 'Escribí tu respuesta…'
                     }
                   />
+                  {mode === 'message' && (
+                    <div className="composer-attachments">
+                      <input
+                        ref={fileInput}
+                        type="file"
+                        className="sr-only"
+                        aria-label="Archivo adjunto"
+                        accept={MEDIA_ACCEPT}
+                        disabled={sending}
+                        onChange={(event) => {
+                          const file = event.target.files?.[0];
+                          event.target.value = '';
+                          if (!file) return;
+                          if (!file.size || file.size > MAX_MEDIA_BYTES) {
+                            setError('El archivo debe pesar entre 1 byte y 3 MB.');
+                            return;
+                          }
+                          const isAudio =
+                            file.type.startsWith('audio/') ||
+                            /\.(mp3|ogg|m4a|aac)$/i.test(file.name);
+                          if (isAudio && draft.trim()) {
+                            setError(
+                              'Los audios se envían sin leyenda. Enviá o quitá el texto antes de adjuntar un audio.',
+                            );
+                            return;
+                          }
+                          if (draft.length > 1024) {
+                            setError(
+                              'La leyenda de un archivo admite hasta 1024 caracteres. Acortá el texto antes de adjuntarlo.',
+                            );
+                            return;
+                          }
+                          setAttachment(file);
+                          nonce.current = null;
+                          setError('');
+                        }}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={sending}
+                        onClick={() => fileInput.current?.click()}
+                      >
+                        <Paperclip size={15} />
+                        Adjuntar archivo
+                      </Button>
+                      {attachment ? (
+                        <span className="selected-attachment">
+                          <strong>{attachment.name}</strong>
+                          <small>{mediaSizeLabel(attachment.size)}</small>
+                          <button
+                            type="button"
+                            disabled={sending}
+                            aria-label="Quitar adjunto"
+                            onClick={() => {
+                              setAttachment(null);
+                              nonce.current = null;
+                            }}
+                          >
+                            <X size={15} />
+                          </button>
+                        </span>
+                      ) : (
+                        <span>Imágenes, audio, video y documentos · Hasta 3 MB</span>
+                      )}
+                      {attachment && (
+                        <small>
+                          Podés agregar una leyenda de hasta 1024 caracteres. Los audios se envían
+                          sin leyenda.
+                        </small>
+                      )}
+                    </div>
+                  )}
                   <div className="composer-bottom">
                     <span>
                       {mode === 'note'
                         ? 'Solo visible para el equipo. No se envía por WhatsApp.'
                         : 'El mensaje quedará en cola hasta que Meta confirme el envío.'}
                     </span>
-                    <Button type="submit" disabled={sending || !draft.trim()}>
+                    <Button
+                      type="submit"
+                      disabled={sending || (!draft.trim() && !(mode === 'message' && attachment))}
+                    >
                       {mode === 'note' ? <StickyNote size={15} /> : <Send size={15} />}{' '}
                       {sending ? 'Guardando…' : mode === 'note' ? 'Guardar nota' : 'Enviar'}
                     </Button>

@@ -1,7 +1,16 @@
 import { z } from 'zod';
 const id = z.string().min(1).max(256);
 const timestamp = z.string().regex(/^\d{1,12}$/);
-const media = z.object({ id: id.optional(), caption: z.string().max(4096).optional() });
+const media = z.object({
+  id: z
+    .string()
+    .regex(/^\d{5,30}$/)
+    .optional(),
+  caption: z.string().max(4096).optional(),
+  mime_type: z.string().max(150).optional(),
+  filename: z.string().max(1024).optional(),
+  sha256: z.string().max(128).optional(),
+});
 export const valueSchema = z.object({
   metadata: z.object({ phone_number_id: z.string().regex(/^\d{5,30}$/) }),
   contacts: z

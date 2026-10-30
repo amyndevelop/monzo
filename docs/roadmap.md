@@ -10,13 +10,17 @@ Cuentas con correo verificado, sesiones persistentes, recuperación, empresas y 
 
 Publicada desde main tras configurar Neon, Resend y secretos en Vercel. El usuario confirmó el correo externo, la cuenta verificada y la creación de una empresa con acceso al dashboard. La cobertura local y los límites de verificación en producción están registrados en docs/progress.md.
 
-## Fase 3 · WhatsApp y atención humana — validación local
+## Fase 3 · WhatsApp y atención humana — publicada
 
-Cloud API oficial, webhook firmado, recepción idempotente, worker Redis/BullMQ, contactos, bandeja, respuestas de texto, estados y colaboración humana. Implementada en `feat/phase-3-whatsapp-inbox`; sin despliegue ni conexión real a Meta. El usuario parte de una cuenta de WhatsApp Business, sin app de desarrollador: comenzar con el número de prueba. El usuario ya creó la app, recibió la prueba de la consola Meta y guardó las tres variables de Meta/cifrado en Vercel. Solicitó alojamiento gratuito: se preparó el modo Vercel + QStash, sujeto a confirmar el plan Free y sus cuotas. Falta configurar QStash, migrar/publicar y probar el flujo bidireccional con MONZO. Ver `docs/phase-3.md`.
+Cloud API oficial, webhook firmado, recepción idempotente, contactos, bandeja, respuestas de texto, estados y colaboración humana. Publicada en Vercel con QStash por eventos, sin worker permanente ni Redis remoto. El usuario confirmó recepción y envío reales con el número de prueba, corrigió el destinatario argentino y sustituyó el token temporal por uno de usuario del sistema. El número comercial permanece sin migrar. Ver `docs/phase-3.md`.
+
+## Fase 4 · Adjuntos — desarrollo autorizado
+
+El usuario autorizó continuar el desarrollo de la siguiente fase tras revisar su alcance. Se implementan imágenes, audio, video y documentos, con apertura/descarga privada y envío por la cola actual. Usa almacenamiento de Meta y un límite de 3 MiB por archivo, sin servicios adicionales. Pendiente de migrar/publicar y probar adjuntos en producción. Ver `docs/phase-4.md`.
 
 ## Fases posteriores · Por definir y autorizar
 
-1. Plantillas, medios y onboarding comercial de canales según requisitos de Meta.
+1. Plantillas y onboarding comercial de canales según requisitos de Meta.
 2. Agentes IA, conocimientos, presupuestos de consumo y escalamiento.
 3. Automatizaciones y herramientas externas sobre el worker.
 4. Analíticas verificables, CRM comercial, suscripciones y facturación.

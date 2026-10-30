@@ -1,6 +1,6 @@
 import type { PrismaClient } from '@prisma/client';
 import { decryptToken } from './crypto';
-import { MetaError, sendText, type MetaFetch } from './meta';
+import { MetaError, sendText, sendMedia, type MetaFetch } from './meta';
 import { withinWindow } from './payload';
 export async function processOutbound(db: PrismaClient, messageId: string, transport?: MetaFetch) {
   const candidate = await db.message.findUnique({
@@ -38,6 +38,16 @@ export async function processOutbound(db: PrismaClient, messageId: string, trans
       });
       return null;
     }
+    if (
+      message.type !== 'text' &&
+      (!['image', 'audio', 'video', 'document'].includes(message.type) || !message.mediaId)
+    ) {
+      await tx.message.update({
+        where: { id: message.id },
+        data: { status: 'FAILED', errorCode: 'MEDIA_UNAVAILABLE' },
+      });
+      return null;
+    }
     let token: string;
     try {
       token = decryptToken(
@@ -62,21 +72,39 @@ export async function processOutbound(db: PrismaClient, messageId: string, trans
       accountId: message.accountId,
       phone: message.account.phoneNumberId,
       to: message.conversation.contact.waId,
-      text: message.text!,
+      text: message.text ?? '',
+      mediaId: message.mediaId,
+      type: message.type,
+      filename: message.mediaFilename,
       token,
       credentialVersion: message.account.tokenEncrypted!,
     };
   });
   if (!claimed) return;
   try {
-    const providerId = await sendText(
-      claimed.phone,
-      claimed.token,
-      claimed.to,
-      claimed.text,
-      claimed.id,
-      transport,
-    );
+    const providerId =
+      claimed.type === 'text'
+        ? await sendText(
+            claimed.phone,
+            claimed.token,
+            claimed.to,
+            claimed.text,
+            claimed.id,
+            transport,
+          )
+        : await sendMedia(
+            claimed.phone,
+            claimed.token,
+            claimed.to,
+            {
+              type: claimed.type,
+              id: claimed.mediaId!,
+              filename: claimed.filename,
+              caption: claimed.text,
+            },
+            claimed.id,
+            transport,
+          );
     await db.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT "id" FROM "Tenant" WHERE "id"=${claimed.tenantId} FOR UPDATE`;
       const current = await tx.message.findUniqueOrThrow({ where: { id: claimed.id } });

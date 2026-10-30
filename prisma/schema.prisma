@@ -237,6 +237,10 @@ model Message {
   type            String
   text            String?
   mediaId         String?
+  mediaMimeType   String?
+  mediaFilename   String?
+  mediaSize       Int?
+  mediaSha256     String?
   providerId      String?
   idempotencyKey  String?
   createdByUserId String?

@@ -34,6 +34,7 @@
     "bullmq": "^5.81.5",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "file-type": "22.3.0",
     "lucide-react": "^0.468.0",
     "next": "16.4.3",
     "nodemailer": "^10.3.1",

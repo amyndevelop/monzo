@@ -29,6 +29,10 @@ export type ChatMessage = {
   errorCode: string | null;
   occurredAt: string;
   createdAt: string;
+  hasMedia: boolean;
+  mediaMimeType: string | null;
+  mediaFilename: string | null;
+  mediaSize: number | null;
 };
 export type ChatSummary = {
   id: string;
