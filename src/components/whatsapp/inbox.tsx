@@ -19,6 +19,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { whatsappRequest } from './http';
 import { MessageAttachment } from './message-attachment';
+import { InboxNavigationToggle } from '@/components/platform/inbox-navigation';
 import { MEDIA_ACCEPT, MAX_MEDIA_BYTES, mediaSizeLabel } from '@/modules/whatsapp/media-policy';
 import type { ChatSummary, ChatThread, ChatMessage, Channels } from '@/modules/whatsapp/types';
 const labels: Record<string, string> = {
@@ -235,6 +236,7 @@ export function Inbox({
     <div className={`inbox ${selected ? 'inbox-has-selection' : ''}`}>
       <aside className="inbox-list">
         <div className="inbox-list-header">
+          <InboxNavigationToggle />
           <div>
             <h2>Tu bandeja</h2>
             <span>Actualización automática</span>
@@ -322,6 +324,7 @@ export function Inbox({
           </div>
         ) : !thread ? (
           <div className="inbox-empty">
+            <InboxNavigationToggle className="thread-navigation-toggle" />
             <Button variant="ghost" onClick={() => selectConversation(null)}>
               <ArrowLeft size={16} />
               Volver a la bandeja
@@ -331,6 +334,7 @@ export function Inbox({
         ) : (
           <>
             <header className="thread-header">
+              <InboxNavigationToggle className="thread-navigation-toggle" />
               <Button
                 className="thread-back"
                 variant="ghost"

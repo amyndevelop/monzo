@@ -48,3 +48,9 @@ Ejecutar `npm run build`, `npm test` y `npm run test:qstash`. Las pruebas de Fas
 El usuario pidió una presentación similar a WhatsApp. Se compactó el compositor con clip y envío circulares, campo de una línea que crece al escribir y vista previa removible del archivo. Respuestas y notas conservan sus modos y validaciones. Enter envía en escritorio, Shift+Enter agrega una línea; en pantallas táctiles Enter conserva el salto de línea.
 
 Las imágenes se integran en la burbuja y admiten ampliación en un diálogo con cierre por Escape. Documentos con nombre/tamaño y descarga discreta. El audio usa controles propios de reproducción, posición y velocidad (1×/1,5×/2×), con tiempos obtenidos del elemento de audio. La forma de onda es decorativa: no representa un análisis de amplitud del archivo. Se conservan carga a pedido, autorización por empresa, cancelación y liberación de object URLs. No requiere migraciones, variables o dependencias nuevas. La reproducción en navegadores que bloquean el inicio después de descargar puede requerir volver a pulsar reproducir.
+
+## Espacio de trabajo de Conversaciones
+
+Conversaciones ocupa el viewport completo (100dvh), con lista e historial que se desplazan dentro de sus paneles. Encabezado de cuenta, título visual y pie generales se omiten solo en esa ruta; el título accesible se conserva. El compositor queda dentro de la pantalla, incluso al reducir la ventana. Otras secciones mantienen su estructura habitual.
+
+El menú privado puede plegarse en escritorio y recuperarse desde la bandeja. En móvil se abre sobre el chat, con fondo inerte, foco contenido y cierre por Escape. Empresa activa, rol y cierre de sesión están disponibles en ese menú. Ocultarlo no descarta la conversación ni el borrador. La preferencia dura durante la navegación cliente y se reinicia al recargar; no se guarda información nueva en localStorage ni en la base.

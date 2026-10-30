@@ -27,6 +27,18 @@ export default async function Section({
   const { section } = await params;
   const item = getSection(section);
   if (!item) notFound();
+  if (section === 'conversaciones')
+    return (
+      <>
+        <h1 className="sr-only">Conversaciones</h1>
+        <Inbox
+          tenantId={context.tenant.id}
+          userId={context.user.id}
+          canAssign={context.membership.role !== 'MEMBER'}
+          initialConversation={(await searchParams).conversation}
+        />
+      </>
+    );
   return (
     <>
       <div className="dashboard-page-title">
@@ -39,14 +51,7 @@ export default async function Section({
           <p>{item.description}</p>
         </div>
       </div>
-      {section === 'conversaciones' ? (
-        <Inbox
-          tenantId={context.tenant.id}
-          userId={context.user.id}
-          canAssign={context.membership.role !== 'MEMBER'}
-          initialConversation={(await searchParams).conversation}
-        />
-      ) : section === 'canales' ? (
+      {section === 'canales' ? (
         <ChannelsPanel tenantId={context.tenant.id} />
       ) : section === 'contactos' ? (
         <Contacts tenantId={context.tenant.id} />
