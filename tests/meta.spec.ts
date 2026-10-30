@@ -150,7 +150,7 @@ test('Meta: renovación distingue consulta y suscripción sin exponer la credenc
       expect(authorizationFailure(failure)).toContain('META_100');
       expect(authorizationFailure(failure)).toContain('La nueva credencial no se guardó');
       expect(authorizationFailure(failure)).not.toContain(token);
-      expect(calls).toHaveLength(failSubscription ? 2 : 1);
+      expect(calls).toHaveLength(failSubscription ? 2 : 4);
     }
   }
 });
@@ -174,4 +174,57 @@ test('Meta: autorización completa comprueba pertenencia antes de suscribir', as
     displayName: 'MONZO',
   });
   expect(calls[1]).toContain('/subscribed_apps');
+});
+
+test('Meta 100: diagnóstico acotado distingue campos, pertenencia y acceso sin suscribir ni filtrar texto', async () => {
+  const { verifyAndSubscribe, authorizationFailure, MetaError } =
+    await import('../src/modules/whatsapp/core/meta');
+  const wabaId = '1171915459097699';
+  for (const scenario of ['fields', 'missing', 'access', 'inaccessible', 'invalid', 'network']) {
+    const calls: { url: string; method: string }[] = [];
+    const transport: MetaFetch = async (url, init) => {
+      calls.push({ url, method: init.method });
+      if (scenario === 'network' && calls.length > 1) throw new Error(token);
+      const minimal = url.includes('/phone_numbers?fields=id&');
+      const object = url.endsWith('?fields=id');
+      const ok =
+        (minimal && ['fields', 'missing'].includes(scenario)) || (object && scenario === 'access');
+      return {
+        ok,
+        status: ok ? 200 : 400,
+        json: async () =>
+          ok
+            ? minimal
+              ? { data: [{ id: scenario === 'missing' ? '9999999' : phoneId }] }
+              : { id: url.includes(wabaId) ? wabaId : phoneId }
+            : {
+                error: {
+                  code: minimal && scenario === 'invalid' ? 190 : 100,
+                  error_subcode: 33,
+                  message: token,
+                  error_user_msg: token,
+                },
+              },
+      };
+    };
+    try {
+      await verifyAndSubscribe(wabaId, phoneId, token, transport);
+      throw new Error('Expected rejection');
+    } catch (error) {
+      expect(error).toBeInstanceOf(MetaError);
+      const failure = error as InstanceType<typeof MetaError>;
+      const message = authorizationFailure(failure);
+      expect(message).not.toContain(token);
+      expect(message).toContain('subcódigo 33');
+      expect(message).toContain('La nueva credencial no se guardó');
+      expect(message).toContain('No se intentó suscribir');
+      if (scenario === 'fields') expect(message).toContain('campos adicionales');
+      if (scenario === 'missing') expect(message).toContain('no aparece');
+      if (scenario === 'access') expect(message).toContain('no confirma su tipo');
+      if (scenario === 'inaccessible') expect(message).toContain('ID incorrecto y falta de acceso');
+      if (scenario === 'invalid') expect(message).toContain('META_190');
+      expect(calls.length).toBeLessThanOrEqual(4);
+      expect(calls.every((call) => call.method === 'GET')).toBe(true);
+    }
+  }
 });
