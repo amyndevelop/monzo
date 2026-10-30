@@ -1,6 +1,8 @@
 import { fetch as httpFetch, EnvHttpProxyAgent } from 'undici';
 const phoneId = /^\d{5,30}$/;
 export class MetaError extends Error {
+  diagnostic?: string;
+  subcode?: number;
   constructor(
     public code: string,
     public uncertain = false,
@@ -41,7 +43,9 @@ export async function graphRequest(
     !/^\d{5,30}\/(messages|phone_numbers|subscribed_apps)(\?fields=id,display_phone_number,verified_name&limit=100)?$/.test(
       path,
     ) &&
-    !templatePath
+    !templatePath &&
+    !/^\d{5,30}\?fields=id$/.test(path) &&
+    !/^\d{5,30}\/phone_numbers\?fields=id&limit=100$/.test(path)
   )
     throw new MetaError('GRAPH_PATH');
   try {
@@ -51,20 +55,62 @@ export async function graphRequest(
       body: body === undefined ? undefined : JSON.stringify(body),
       signal: AbortSignal.timeout(15000),
     });
-    const data = (await response.json()) as { error?: { code?: number }; [key: string]: unknown };
-    if (!response.ok)
-      throw new MetaError(
+    const data = (await response.json()) as {
+      error?: { code?: number; error_subcode?: number };
+      [key: string]: unknown;
+    };
+    if (!response.ok) {
+      const failure = new MetaError(
         typeof data.error?.code === 'number'
           ? `META_${data.error.code}`
           : `HTTP_${response.status}`,
         response.status >= 500,
       );
+      if (Number.isSafeInteger(data.error?.error_subcode) && data.error!.error_subcode! >= 0)
+        failure.subcode = data.error!.error_subcode;
+      throw failure;
+    }
     return data;
   } catch (error) {
     if (error instanceof MetaError) throw error;
     throw new MetaError('NETWORK_UNKNOWN', method === 'POST');
   }
 }
+
+// Bounded read-only probes after a rejected lookup. Never infer token validity
+// or asset ownership from an ambiguous Graph error; never return provider text.
+async function diagnosePhoneLookup(
+  wabaId: string,
+  phoneNumberId: string,
+  token: string,
+  transport?: MetaFetch,
+) {
+  const probe = async (path: string) => {
+    try {
+      return { data: await graphRequest(path, token, 'GET', undefined, transport), code: 'OK' };
+    } catch (error) {
+      return { data: null, code: error instanceof MetaError ? error.code : 'NETWORK_UNKNOWN' };
+    }
+  };
+  const minimal = await probe(`${wabaId}/phone_numbers?fields=id&limit=100`);
+  if (minimal.code === 'OK') {
+    const phones = minimal.data?.data;
+    if (!Array.isArray(phones))
+      return 'La consulta mínima respondió sin una lista válida de números. No se intentó suscribir la app.';
+    return phones.some((phone: { id?: string }) => phone.id === phoneNumberId)
+      ? 'La consulta mínima sí encontró el número en esa WABA. El rechazo está en la consulta con campos adicionales; no cambies los IDs ni regeneres el token por este resultado. No se intentó suscribir la app.'
+      : 'La consulta mínima accedió a la lista, pero el Phone Number ID no aparece entre los primeros 100 números. Revisá que pertenezca a esa WABA. No se intentó suscribir la app.';
+  }
+  if (minimal.code === 'META_190')
+    return 'Meta rechazó la credencial también en la consulta mínima (META_190). No se intentó suscribir la app.';
+  const [waba, phone] = await Promise.all([
+    probe(`${wabaId}?fields=id`),
+    probe(`${phoneNumberId}?fields=id`),
+  ]);
+  const access = (code: string) => (code === 'OK' ? 'accesible' : `no accesible (${code})`);
+  return `Comprobaciones de lectura: objeto del WABA ID ${access(waba.code)}; objeto del Phone Number ID ${access(phone.code)}; lista mínima de números rechazada (${minimal.code}). Leer un objeto por ID no confirma su tipo ni la relación entre ambos. Si un objeto no es accesible, Graph no permite distinguir solo con este error entre ID incorrecto y falta de acceso. Revisá en Meta la cuenta seleccionada y su asignación al usuario del sistema. No se intentó suscribir la app.`;
+}
+
 export async function verifyAndSubscribe(
   wabaId: string,
   phoneNumberId: string,
@@ -81,7 +127,11 @@ export async function verifyAndSubscribe(
     try {
       return await graphRequest(path, token, method, body, transport);
     } catch (error) {
-      if (error instanceof MetaError) error.authorizationStep = step;
+      if (error instanceof MetaError) {
+        error.authorizationStep = step;
+        if (step === 'phone_lookup' && error.code === 'META_100')
+          error.diagnostic = await diagnosePhoneLookup(wabaId, phoneNumberId, token, transport);
+      }
       throw error;
     }
   };
@@ -233,5 +283,5 @@ export function authorizationFailure(error: MetaError) {
         : error.code === 'PHONE_NOT_IN_WABA'
           ? 'El número no aparece entre los primeros 100 números de esa cuenta. Revisá que ambos IDs correspondan a la misma cuenta.'
           : 'Revisá la app, los IDs y los permisos o reintentá si hubo un problema de red.';
-  return `No pudimos completar la autorización ${step} (${error.code}). ${reason} La nueva credencial no se guardó; la conexión anterior conserva su estado.`;
+  return `No pudimos completar la autorización ${step} (${error.code}${error.subcode === undefined ? '' : `, subcódigo ${error.subcode}`}). ${error.diagnostic ?? reason} La nueva credencial no se guardó; la conexión anterior conserva su estado.`;
 }

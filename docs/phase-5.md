@@ -101,3 +101,19 @@ Si existe credencial en un canal desconectado, la comprobación admite las lectu
 pero conserva enabled=false y explica que no reconecta el canal. El CAS compara el
 estado habilitado original para respetar desconexiones concurrentes. La desconexión
 normal elimina el token, por lo que no hay un token anterior recuperable en ese caso.
+
+### Diagnóstico acotado de META_100 durante el alta
+
+Si la consulta de números falla con META_100, el servidor realiza hasta tres GET
+adicionales con la credencial presentada, sin guardarla ni suscribir la app: primero
+pide la lista con solo `fields=id`; si esa consulta también falla (salvo META_190),
+consulta por separado cada objeto con `fields=id`. Distingue campos adicionales
+rechazados, número ausente de la primera página y objetos accesibles/no accesibles.
+No presenta como certeza que el token esté vencido, que el ID esté mal o que falten
+permisos: Graph puede responder igual para objetos inexistentes o no autorizados.
+Leer un objeto tampoco demuestra su tipo ni la relación número/WABA. La consulta
+mínima exitosa se usa solo para diagnóstico; no omite la verificación del alta.
+
+Solo expone textos generados por MONZO y subcódigos enteros no negativos de Meta;
+nunca copia mensajes libres, cuerpos, headers ni tokens. Las consultas son fijas y
+validadas, sin URLs proporcionadas por Meta. No agrega migraciones ni variables.
