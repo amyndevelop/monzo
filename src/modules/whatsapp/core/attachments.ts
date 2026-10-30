@@ -1,3 +1,4 @@
+import { pauseForHuman } from '../../automations/runtime';
 import type { Prisma, PrismaClient } from '@prisma/client';
 import { z } from 'zod';
 import { decryptToken } from './crypto';
@@ -144,6 +145,7 @@ export async function enqueueAttachment(
         'SEND_RATE_LIMIT',
         'Alcanzaste el límite de envíos por minuto. Intentá más tarde.',
       );
+    await pauseForHuman(tx, tenantId, conversationId);
     const message = await tx.message.create({
       data: {
         tenantId,

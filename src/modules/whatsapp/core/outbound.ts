@@ -1,6 +1,14 @@
 import type { PrismaClient } from '@prisma/client';
+import { snapshotSchema, interactivePayload } from '../../automations/definition';
 import { decryptToken } from './crypto';
-import { MetaError, sendText, sendMedia, sendTemplate, type MetaFetch } from './meta';
+import {
+  MetaError,
+  sendText,
+  sendMedia,
+  sendTemplate,
+  sendInteractive,
+  type MetaFetch,
+} from './meta';
 import { withinWindow } from './payload';
 import { checkQueuedTemplate, templateComponents } from './templates';
 export async function processOutbound(db: PrismaClient, messageId: string, transport?: MetaFetch) {
@@ -26,6 +34,31 @@ export async function processOutbound(db: PrismaClient, messageId: string, trans
           },
         })
       : null;
+    const snapshot = message.automationFlowId
+      ? snapshotSchema.safeParse(message.automationSnapshot)
+      : null;
+    const flow = message.automationFlowId
+      ? await tx.automationFlow.findFirst({
+          where: {
+            id: message.automationFlowId,
+            accountId: message.accountId,
+            tenantId: message.tenantId,
+          },
+        })
+      : null;
+    const automationProblem =
+      message.automationFlowId &&
+      (!snapshot?.success ||
+        !flow?.enabled ||
+        snapshot.data.flowId !== flow.id ||
+        flow.publishedVersion !== snapshot.data.publishedVersion ||
+        message.conversation.automationPaused ||
+        message.conversation.assignedUserId ||
+        message.conversation.automationGeneration !== snapshot.data.generation ||
+        flow.publishedByUserId !== message.createdByUserId ||
+        membership?.role === 'MEMBER')
+        ? 'AUTOMATION_PAUSED'
+        : null;
     const problem = !membership
       ? 'MEMBERSHIP_REVOKED'
       : !message.account.enabled || !message.account.tokenEncrypted
@@ -45,16 +78,17 @@ export async function processOutbound(db: PrismaClient, messageId: string, trans
         message.template.status !== 'APPROVED')
         ? 'TEMPLATE_CHANGED'
         : null;
-    if (problem || templateProblem) {
+    if (problem || templateProblem || automationProblem) {
       await tx.message.update({
         where: { id: message.id },
-        data: { status: 'CANCELED', errorCode: problem ?? templateProblem },
+        data: { status: 'CANCELED', errorCode: problem ?? templateProblem ?? automationProblem },
       });
       return null;
     }
     if (
       message.type !== 'text' &&
       message.type !== 'template' &&
+      !(message.type === 'interactive' && snapshot?.success && snapshot.data.kind === 'menu') &&
       (!['image', 'audio', 'video', 'document'].includes(message.type) || !message.mediaId)
     ) {
       await tx.message.update({
@@ -93,46 +127,56 @@ export async function processOutbound(db: PrismaClient, messageId: string, trans
       filename: message.mediaFilename,
       token,
       credentialVersion: message.account.tokenEncrypted!,
+      automation: snapshot?.success ? snapshot.data : null,
     };
   });
   if (!claimed) return;
   try {
     const providerId =
-      claimed.type === 'text'
-        ? await sendText(
+      claimed.type === 'interactive' && claimed.automation
+        ? await sendInteractive(
             claimed.phone,
             claimed.token,
             claimed.to,
-            claimed.text,
+            interactivePayload(claimed.automation),
             claimed.id,
             transport,
           )
-        : claimed.type === 'template' && checkedTemplate
-          ? await sendTemplate(
+        : claimed.type === 'text'
+          ? await sendText(
               claimed.phone,
               claimed.token,
               claimed.to,
-              {
-                name: checkedTemplate.snapshot.definition.name,
-                language: checkedTemplate.snapshot.definition.language,
-                components: templateComponents(checkedTemplate.snapshot),
-              },
+              claimed.text,
               claimed.id,
               transport,
             )
-          : await sendMedia(
-              claimed.phone,
-              claimed.token,
-              claimed.to,
-              {
-                type: claimed.type,
-                id: claimed.mediaId!,
-                filename: claimed.filename,
-                caption: claimed.text,
-              },
-              claimed.id,
-              transport,
-            );
+          : claimed.type === 'template' && checkedTemplate
+            ? await sendTemplate(
+                claimed.phone,
+                claimed.token,
+                claimed.to,
+                {
+                  name: checkedTemplate.snapshot.definition.name,
+                  language: checkedTemplate.snapshot.definition.language,
+                  components: templateComponents(checkedTemplate.snapshot),
+                },
+                claimed.id,
+                transport,
+              )
+            : await sendMedia(
+                claimed.phone,
+                claimed.token,
+                claimed.to,
+                {
+                  type: claimed.type,
+                  id: claimed.mediaId!,
+                  filename: claimed.filename,
+                  caption: claimed.text,
+                },
+                claimed.id,
+                transport,
+              );
     await db.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT "id" FROM "Tenant" WHERE "id"=${claimed.tenantId} FOR UPDATE`;
       const current = await tx.message.findUniqueOrThrow({ where: { id: claimed.id } });

@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { Prisma, type PrismaClient, type MessageStatus } from '@prisma/client';
+import { advanceAutomation } from '../../automations/runtime';
 import { envelopeSchema, valueSchema, providerDate } from './payload';
 export async function captureWebhook(db: PrismaClient, raw: Buffer) {
   const parsed = envelopeSchema.parse(JSON.parse(raw.toString('utf8')));
@@ -71,7 +72,7 @@ const rank: Partial<Record<MessageStatus, number>> = {
   READ: 3,
 };
 export async function processWebhook(db: PrismaClient, eventId: string) {
-  return db.$transaction(
+  await db.$transaction(
     async (tx) => {
       await tx.$queryRaw`SELECT "id" FROM "WhatsappWebhookEvent" WHERE "id"=${eventId} FOR UPDATE`;
       const event = await tx.whatsappWebhookEvent.findUnique({
@@ -117,12 +118,13 @@ export async function processWebhook(db: PrismaClient, eventId: string) {
               contactId: contact.id,
               lastMessageAt: date,
               lastInboundAt: date,
+              automationPaused: false,
             },
             update: {},
           });
           const media =
             message.image ?? message.audio ?? message.video ?? message.document ?? message.sticker;
-          await tx.message.create({
+          const savedIncoming = await tx.message.create({
             data: {
               tenantId: event.tenantId,
               accountId: account.id,
@@ -159,6 +161,13 @@ export async function processWebhook(db: PrismaClient, eventId: string) {
                 ? { status: 'OPEN', closedAt: null }
                 : {}),
             },
+          });
+          await advanceAutomation(tx, account, conversation, {
+            id: savedIncoming.id,
+            text: message.text?.body ?? message.button?.text ?? '',
+            choice: message.interactive?.button_reply?.id ?? message.interactive?.list_reply?.id,
+            at: date,
+            eventId: event.id,
           });
         }
         for (const receipt of value.statuses ?? []) {
@@ -209,4 +218,8 @@ export async function processWebhook(db: PrismaClient, eventId: string) {
     },
     { timeout: 15000 },
   );
+  return db.message.findMany({
+    where: { automationEventId: eventId, status: 'QUEUED' },
+    select: { id: true },
+  });
 }

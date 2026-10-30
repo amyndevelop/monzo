@@ -16,6 +16,7 @@ import {
   FileText,
   LoaderCircle,
 } from 'lucide-react';
+import { ConversationFlowControl } from '@/components/automations/conversation-control';
 import { Button } from '@/components/ui/button';
 import { whatsappRequest } from './http';
 import { MessageAttachment } from './message-attachment';
@@ -46,6 +47,9 @@ const errorLabels: Record<string, string> = {
   MEMBERSHIP_REVOKED: 'El operador ya no tiene acceso a esta empresa.',
   CREDENTIALS_UNAVAILABLE: 'Actualizá la autorización del canal en Canales.',
   ACCOUNT_DISABLED: 'El canal está desconectado. Revisá su autorización en Canales.',
+  AUTOMATION_PAUSED: 'El flujo se pausó antes de enviar esta respuesta.',
+  AUTOMATION_CHANGED: 'La versión del flujo cambió antes del envío.',
+  AUTOMATION_ADVANCED: 'El cliente ya avanzó a otro paso del flujo.',
   META_190: 'La autorización de Meta venció o fue revocada. Actualizala en Canales.',
 };
 function time(value: string) {
@@ -376,6 +380,12 @@ export function Inbox({
                 {thread.conversation.status === 'OPEN' ? 'Cerrar' : 'Reabrir'}
               </Button>
             </header>
+            <ConversationFlowControl
+              key={thread.conversation.id}
+              base={base}
+              thread={thread}
+              onChange={refreshThread}
+            />
             <div className="thread-tools">
               <label>
                 <UserRound size={14} />
@@ -473,6 +483,9 @@ export function Inbox({
                     <p>{messageText(message)}</p>
                   ) : null}
                   <footer>
+                    {message.automation && (
+                      <span className="flow-message-badge">Automatización</span>
+                    )}
                     <time dateTime={message.occurredAt}>{time(message.occurredAt)}</time>
                     {message.direction === 'OUTBOUND' && (
                       <span className={`message-state state-${message.status.toLowerCase()}`}>

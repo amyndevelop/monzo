@@ -182,7 +182,12 @@ export async function verifyJob(raw: string, signature: string | null) {
     return false;
   }
 }
-export async function processJob(db: PrismaClient, job: WhatsappJob, transport?: MetaFetch) {
+export async function processJob(
+  db: PrismaClient,
+  job: WhatsappJob,
+  transport?: MetaFetch,
+  queueTransport?: QueueFetch,
+) {
   if (job.kind === 'watchdog') {
     await db.message.updateMany({
       where: { id: job.id, status: 'SENDING', attemptedAt: { lt: new Date(Date.now() - 120000) } },
@@ -191,8 +196,9 @@ export async function processJob(db: PrismaClient, job: WhatsappJob, transport?:
   } else if (job.kind === 'outbox') {
     await processOutbound(db, job.id, transport);
   } else {
+    let automatic: { id: string }[] = [];
     try {
-      await processWebhook(db, job.id);
+      automatic = await processWebhook(db, job.id);
     } catch {
       await db.whatsappWebhookEvent.updateMany({
         where: { id: job.id, state: 'PENDING' },
@@ -204,5 +210,10 @@ export async function processJob(db: PrismaClient, job: WhatsappJob, transport?:
       });
       if (!exhausted.count) throw new Error('WEBHOOK_PROCESSING_FAILED');
     }
+    await dispatchJobs(
+      db,
+      automatic.map((message) => ({ kind: 'outbox' as const, id: message.id })),
+      queueTransport,
+    );
   }
 }

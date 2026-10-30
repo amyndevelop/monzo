@@ -44,6 +44,7 @@ model Tenant {
   messages          Message[]
   webhookEvents     WhatsappWebhookEvent[]
   conversationNotes ConversationNote[]
+  automationFlows   AutomationFlow[]
   aiAgent           AiAgent?
   whatsappTemplates WhatsappTemplate[]
 }
@@ -182,6 +183,7 @@ model WhatsappAccount {
   conversations        Conversation[]
   messages             Message[]
   webhookEvents        WhatsappWebhookEvent[]
+  automationFlow       AutomationFlow?
   templates            WhatsappTemplate[]
 
   @@unique([id, tenantId])
@@ -206,24 +208,27 @@ model Contact {
 }
 
 model Conversation {
-  id             String             @id @default(cuid())
-  tenantId       String
-  tenant         Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  accountId      String
-  account        WhatsappAccount    @relation(fields: [accountId, tenantId], references: [id, tenantId], onDelete: Restrict)
-  contactId      String
-  contact        Contact            @relation(fields: [contactId, accountId, tenantId], references: [id, accountId, tenantId], onDelete: Restrict)
-  status         ConversationStatus @default(OPEN)
-  assignedUserId String?
-  assignedUser   User?              @relation("AssignedAgent", fields: [assignedUserId], references: [id], onDelete: Restrict)
-  unreadCount    Int                @default(0)
-  lastMessageAt  DateTime           @default(now())
-  lastInboundAt  DateTime?
-  closedAt       DateTime?
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
-  messages       Message[]
-  notes          ConversationNote[]
+  id                   String             @id @default(cuid())
+  tenantId             String
+  tenant               Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  accountId            String
+  account              WhatsappAccount    @relation(fields: [accountId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  contactId            String
+  contact              Contact            @relation(fields: [contactId, accountId, tenantId], references: [id, accountId, tenantId], onDelete: Restrict)
+  status               ConversationStatus @default(OPEN)
+  assignedUserId       String?
+  assignedUser         User?              @relation("AssignedAgent", fields: [assignedUserId], references: [id], onDelete: Restrict)
+  automationPaused     Boolean            @default(true)
+  automationGeneration Int                @default(0)
+  automationState      Json?
+  unreadCount          Int                @default(0)
+  lastMessageAt        DateTime           @default(now())
+  lastInboundAt        DateTime?
+  closedAt             DateTime?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  messages             Message[]
+  notes                ConversationNote[]
 
   @@unique([accountId, contactId])
   @@unique([id, accountId, tenantId])
@@ -232,39 +237,45 @@ model Conversation {
 }
 
 model Message {
-  id               String            @id @default(cuid())
-  tenantId         String
-  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  accountId        String
-  account          WhatsappAccount   @relation(fields: [accountId, tenantId], references: [id, tenantId], onDelete: Restrict)
-  conversationId   String
-  conversation     Conversation      @relation(fields: [conversationId, accountId, tenantId], references: [id, accountId, tenantId], onDelete: Restrict)
-  direction        MessageDirection
-  status           MessageStatus
-  type             String
-  text             String?
-  mediaId          String?
-  mediaMimeType    String?
-  mediaFilename    String?
-  mediaSize        Int?
-  mediaSha256      String?
-  templateId       String?
-  templateSnapshot Json?
-  template         WhatsappTemplate? @relation(fields: [templateId, accountId, tenantId], references: [id, accountId, tenantId], onDelete: Restrict)
-  providerId       String?
-  idempotencyKey   String?
-  createdByUserId  String?
-  createdByUser    User?             @relation("MessageAuthor", fields: [createdByUserId], references: [id], onDelete: Restrict)
-  errorCode        String?
-  attemptedAt      DateTime?
-  jobPublishedAt   DateTime?
-  occurredAt       DateTime
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
+  id                 String            @id @default(cuid())
+  tenantId           String
+  tenant             Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  accountId          String
+  account            WhatsappAccount   @relation(fields: [accountId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  conversationId     String
+  conversation       Conversation      @relation(fields: [conversationId, accountId, tenantId], references: [id, accountId, tenantId], onDelete: Restrict)
+  direction          MessageDirection
+  status             MessageStatus
+  type               String
+  text               String?
+  mediaId            String?
+  mediaMimeType      String?
+  mediaFilename      String?
+  mediaSize          Int?
+  mediaSha256        String?
+  automationFlowId   String?
+  automationFlow     AutomationFlow?   @relation(fields: [automationFlowId, accountId, tenantId], references: [id, accountId, tenantId], onDelete: Restrict)
+  automationSnapshot Json?
+  automationSourceId String?           @unique
+  automationEventId  String?
+  templateId         String?
+  templateSnapshot   Json?
+  template           WhatsappTemplate? @relation(fields: [templateId, accountId, tenantId], references: [id, accountId, tenantId], onDelete: Restrict)
+  providerId         String?
+  idempotencyKey     String?
+  createdByUserId    String?
+  createdByUser      User?             @relation("MessageAuthor", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  errorCode          String?
+  attemptedAt        DateTime?
+  jobPublishedAt     DateTime?
+  occurredAt         DateTime
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
 
   @@unique([accountId, providerId])
   @@unique([tenantId, idempotencyKey])
   @@index([tenantId, conversationId, createdAt])
+  @@index([automationEventId, status])
   @@index([status, createdAt])
 }
 
@@ -345,4 +356,26 @@ model AiAgent {
   revision     Int      @default(1)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+}
+
+model AutomationFlow {
+  id                String          @id @default(cuid())
+  tenantId          String
+  tenant            Tenant          @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  accountId         String          @unique
+  account           WhatsappAccount @relation(fields: [accountId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  draft             Json
+  published         Json?
+  revision          Int             @default(1)
+  publishedVersion  Int             @default(0)
+  publishedByUserId String?
+  enabled           Boolean         @default(false)
+  activatedAt       DateTime?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  messages          Message[]
+
+  @@unique([accountId, tenantId])
+  @@unique([id, accountId, tenantId])
+  @@index([tenantId])
 }

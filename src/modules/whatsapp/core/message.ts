@@ -16,12 +16,14 @@ export const messageFields = {
   mediaFilename: true,
   mediaSize: true,
   templateSnapshot: true,
+  automationFlowId: true,
 } as const;
 export function presentMessage(
   message: Prisma.MessageGetPayload<{ select: typeof messageFields }>,
 ) {
   const template = readTemplateSnapshot(message.templateSnapshot);
   return {
+    automation: Boolean(message.automationFlowId),
     template: template ? renderTemplatePreview(template.definition, template.values) : null,
     id: message.id,
     direction: message.direction,

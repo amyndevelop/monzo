@@ -8,6 +8,7 @@ import { getSection } from '@/modules/platform/navigation';
 import { Inbox } from '@/components/whatsapp/inbox';
 import { ChannelsPanel } from '@/components/whatsapp/channels-panel';
 import { Contacts } from '@/components/whatsapp/contacts';
+import { AutomationPanel } from '@/components/automations/flow-editor';
 import { AgentLab } from '@/components/ai/agent-lab';
 import { Mascot } from '@/components/brand/mascot';
 export async function generateMetadata({
@@ -54,6 +55,8 @@ export default async function Section({
       </div>
       {section === 'canales' ? (
         <ChannelsPanel tenantId={context.tenant.id} />
+      ) : section === 'automatizaciones' ? (
+        <AutomationPanel key={context.tenant.id} tenantId={context.tenant.id} />
       ) : section === 'agentes-ia' ? (
         <AgentLab key={context.tenant.id} tenantId={context.tenant.id} />
       ) : section === 'contactos' ? (
