@@ -125,7 +125,9 @@ test('bandeja responsive: recibir, responder en cola, notas internas y estados m
     'Consulta de prueba',
   );
   await page.getByLabel('Mensaje de WhatsApp', { exact: true }).fill('Respuesta desde la bandeja');
-  await page.getByRole('button', { name: 'Enviar', exact: true }).click();
+  if (testInfo.project.name === 'desktop')
+    await page.getByLabel('Mensaje de WhatsApp', { exact: true }).press('Enter');
+  else await page.getByRole('button', { name: 'Enviar', exact: true }).click();
   await expect(page.getByText('En cola', { exact: true })).toBeVisible();
   const outgoing = await db.message.findFirstOrThrow({
     where: { conversationId, direction: 'OUTBOUND' },

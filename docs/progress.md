@@ -169,3 +169,11 @@ El código está preparado para revisión y publicación después de que el usua
 El usuario ejecutó la consulta nueva y compartió el resultado **neondb | 4 | 5**: cuatro columnas de adjuntos y cinco migraciones aplicadas. Esto confirma la actualización requerida para publicar el cliente Prisma de Fase 4. No se usaron credenciales de Neon desde este entorno.
 
 La implementación `163d086` se integró por fast-forward en main, manteniendo las verificaciones ya registradas. Se prepara el push para activar Vercel. La compilación y pruebas de esta entrega ya estaban aprobadas; esta actualización solo registra la evidencia externa y la publicación, sin cambios de comportamiento. Pendiente externo: estado Ready y recorrido de una imagen/audio/documento entre el teléfono y MONZO.
+
+## Adjuntos reales confirmados · Presentación de chat renovada
+
+El usuario confirmó que Fase 4 funciona en producción y compartió una captura de imagen y audio. Pidió suavizar los bloques y el botón de adjuntar, tomando WhatsApp como referencia. Se renovaron las burbujas y el fondo, imágenes integradas con vista ampliada, documentos compactos y audio con reproducción/pausa, posición y velocidad. El gráfico de audio es decorativo; tiempos y posición provienen del archivo real. La barra de escritura usa clip y envío circulares, crece al escribir y muestra una vista previa removible del adjunto. Enter envía en escritorio y Shift+Enter agrega una línea; en pantallas táctiles Enter conserva el salto. La carga de medios sigue siendo a pedido.
+
+Validación: lint, TypeScript, compilación y formato aprobados. **48/48** casos de WhatsApp/adjuntos en escritorio y móvil; controles de audio y diálogo con Escape incluidos. Después se ampliaron las comprobaciones de teclado y se aprobaron los **4/4** casos de bandeja seleccionados, verificando Enter, Shift+Enter, descarga y conservación del borrador/archivo ante un fallo de proveedor. Capturas de ambos tamaños revisadas, sin desborde horizontal. Son pruebas locales con archivos de fixture y transportes explícitos; no se afirma validación del rediseño en el navegador real del usuario.
+
+Este ajuste no requiere migraciones, tokens ni servicios adicionales. Se prepara la publicación del cambio visual sobre el esquema de producción ya confirmado.

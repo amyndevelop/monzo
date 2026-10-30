@@ -1,6 +1,6 @@
 # Fase 4 · Adjuntos de WhatsApp
 
-Estado: implementada en `163d086` e integrada en `main` para publicación. El usuario ejecutó el SQL de Fase 4 y confirmó **neondb | 4 | 5**. La migración de producción quedó verificada por ese resultado; falta comprobar Ready en Vercel y adjuntos reales. Fase 3 ya está funcionando en producción: el usuario confirmó recepción y respuesta real y luego sustituyó el token temporal por un token de usuario del sistema. No se leyó la credencial ni se verificó su fecha de vencimiento desde este entorno.
+Estado: implementada en `163d086` y publicada mediante `4f0e20e`. El usuario confirmó que los adjuntos funcionan y compartió la bandeja con imagen/audio reales. El usuario ejecutó el SQL de Fase 4 y confirmó **neondb | 4 | 5**. La migración de producción y el funcionamiento de adjuntos fueron confirmados por el usuario; no se consultó Ready directamente desde este entorno. Fase 3 ya está funcionando en producción: el usuario confirmó recepción y respuesta real y luego sustituyó el token temporal por un token de usuario del sistema. No se leyó la credencial ni se verificó su fecha de vencimiento desde este entorno.
 
 ## Alcance
 
@@ -41,4 +41,10 @@ La migración `202610300001_whatsapp_media` agrega cuatro columnas nulas a Messa
 
 `tests/media.spec.ts` cubre formatos con fixtures reales de audio/video, límites, hash, URL/host de descarga, multipart, concurrencia, idempotencia, revocación durante HTTP, aislamiento entre empresas, payloads de Meta, variante argentina, carga a pedido, descargas y reproducción en escritorio/móvil. La API real rechaza red externa en monzo_test; los contratos positivos de Meta usan transportes explícitos, y la UI recibe archivos de fixtures mediante una ruta interceptada identificada en la prueba. No se presentan esas pruebas como entrega real externa de adjuntos.
 
-Ejecutar `npm run build`, `npm test` y `npm run test:qstash`. Las pruebas de Fase 3 y autenticación continúan activas. Los resultados finales de esta entrega se registran en `docs/progress.md`. El usuario confirmó la migración de producción con neondb | 4 | 5; todavía no confirmó envío/descarga de adjuntos reales.
+Ejecutar `npm run build`, `npm test` y `npm run test:qstash`. Las pruebas de Fase 3 y autenticación continúan activas. Los resultados finales de esta entrega se registran en `docs/progress.md`. El usuario confirmó la migración de producción con neondb | 4 | 5; posteriormente confirmó el funcionamiento real de adjuntos en el número de prueba.
+
+## Ajuste visual de la bandeja
+
+El usuario pidió una presentación similar a WhatsApp. Se compactó el compositor con clip y envío circulares, campo de una línea que crece al escribir y vista previa removible del archivo. Respuestas y notas conservan sus modos y validaciones. Enter envía en escritorio, Shift+Enter agrega una línea; en pantallas táctiles Enter conserva el salto de línea.
+
+Las imágenes se integran en la burbuja y admiten ampliación en un diálogo con cierre por Escape. Documentos con nombre/tamaño y descarga discreta. El audio usa controles propios de reproducción, posición y velocidad (1×/1,5×/2×), con tiempos obtenidos del elemento de audio. La forma de onda es decorativa: no representa un análisis de amplitud del archivo. Se conservan carga a pedido, autorización por empresa, cancelación y liberación de object URLs. No requiere migraciones, variables o dependencias nuevas. La reproducción en navegadores que bloquean el inicio después de descargar puede requerir volver a pulsar reproducir.

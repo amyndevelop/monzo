@@ -1,6 +1,6 @@
-# MONZO · Fase 4 en publicación
+# MONZO · Fase 4 publicada
 
-Plataforma SaaS en desarrollo. Landing comercial, demo pública y acceso por cuenta verificada a espacios independientes de empresa. Las Fases 1, 2 y 3 están publicadas: el usuario confirmó recepción y respuesta de texto con Meta real mediante Vercel/QStash. La Fase 4 agrega adjuntos y está integrada en main para publicación. El usuario confirmó la quinta migración de Neon; faltan Ready y la prueba real de archivos. Ver [Fase 4](docs/phase-4.md). El push autorizado a main activa el despliegue automático de Vercel; los flujos de producción se verifican por separado.
+Plataforma SaaS en desarrollo. Landing comercial, demo pública y acceso por cuenta verificada a espacios independientes de empresa. Las Fases 1 a 4 están publicadas: el usuario confirmó recepción y respuesta de texto con Meta real mediante Vercel/QStash. La Fase 4 agrega adjuntos; el usuario confirmó la quinta migración de Neon y su funcionamiento real con el número de prueba. Ver [Fase 4](docs/phase-4.md). El push autorizado a main activa el despliegue automático de Vercel; los flujos de producción se verifican por separado.
 
 ## Desarrollo local
 

@@ -13,6 +13,8 @@ import {
   UserRound,
   Paperclip,
   X,
+  FileText,
+  LoaderCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { whatsappRequest } from './http';
@@ -69,6 +71,28 @@ export function Inbox({
   const [draft, setDraft] = useState('');
   const [attachment, setAttachment] = useState<File | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  const draftInput = useRef<HTMLTextAreaElement>(null);
+  const [attachmentPreview, setAttachmentPreview] = useState<string | null>(null);
+  const previewRef = useRef<string | null>(null);
+  useEffect(
+    () => () => {
+      if (previewRef.current) URL.revokeObjectURL(previewRef.current);
+    },
+    [],
+  );
+  function clearAttachment() {
+    if (previewRef.current) URL.revokeObjectURL(previewRef.current);
+    previewRef.current = null;
+    setAttachmentPreview(null);
+    setAttachment(null);
+  }
+  function chooseAttachment(file: File) {
+    if (previewRef.current) URL.revokeObjectURL(previewRef.current);
+    const url = ['image/jpeg', 'image/png'].includes(file.type) ? URL.createObjectURL(file) : null;
+    previewRef.current = url;
+    setAttachmentPreview(url);
+    setAttachment(file);
+  }
   const [mode, setMode] = useState<'message' | 'note'>('message');
   const [listLoaded, setListLoaded] = useState(false);
   const [hasMore, setHasMore] = useState(false);
@@ -80,7 +104,7 @@ export function Inbox({
     setSelected(id);
     setThread(null);
     setDraft('');
-    setAttachment(null);
+    clearAttachment();
     nonce.current = null;
   }
   useEffect(() => {
@@ -408,7 +432,7 @@ export function Inbox({
               )}
               {thread.messages.map((message) => (
                 <article
-                  className={`chat-bubble ${message.direction === 'OUTBOUND' ? 'outgoing' : 'incoming'}`}
+                  className={`chat-bubble kind-${message.type} ${message.text ? 'has-caption' : ''} ${message.direction === 'OUTBOUND' ? 'outgoing' : 'incoming'}`}
                   key={message.id}
                 >
                   {['image', 'audio', 'video', 'document', 'sticker'].includes(message.type) && (
@@ -493,7 +517,8 @@ export function Inbox({
                       });
                   }
                   setDraft('');
-                  setAttachment(null);
+                  if (draftInput.current) draftInput.current.style.height = 'auto';
+                  clearAttachment();
                   nonce.current = null;
                   await refreshThread();
                 } catch (error) {
@@ -513,11 +538,11 @@ export function Inbox({
                   onClick={() => {
                     setMode('message');
                     setDraft('');
-                    setAttachment(null);
+                    clearAttachment();
                     nonce.current = null;
                   }}
                 >
-                  Respuesta por WhatsApp
+                  <MessageCircle size={13} /> WhatsApp
                 </button>
                 <button
                   type="button"
@@ -526,11 +551,11 @@ export function Inbox({
                   onClick={() => {
                     setMode('note');
                     setDraft('');
-                    setAttachment(null);
+                    clearAttachment();
                     nonce.current = null;
                   }}
                 >
-                  Nota interna
+                  <StickyNote size={13} /> Nota interna
                 </button>
               </div>
               {mode === 'message' && !openWindow ? (
@@ -540,113 +565,147 @@ export function Inbox({
                 </p>
               ) : (
                 <>
-                  <label className="sr-only" htmlFor="chat-draft">
-                    {mode === 'note' ? 'Nota interna' : 'Mensaje de WhatsApp'}
-                  </label>
-                  <textarea
-                    id="chat-draft"
-                    value={draft}
-                    maxLength={mode === 'note' ? 2000 : attachment ? 1024 : 4096}
-                    disabled={sending || audioAttachment}
-                    onChange={(event) => {
-                      setDraft(event.target.value);
-                      nonce.current = null;
-                    }}
-                    placeholder={
-                      mode === 'note'
-                        ? 'Solo tu equipo podrá ver esta nota…'
-                        : audioAttachment
-                          ? 'Audio seleccionado. Se envía sin leyenda.'
-                          : 'Escribí tu respuesta…'
-                    }
-                  />
                   {mode === 'message' && (
-                    <div className="composer-attachments">
-                      <input
-                        ref={fileInput}
-                        type="file"
-                        className="sr-only"
-                        aria-label="Archivo adjunto"
-                        accept={MEDIA_ACCEPT}
-                        disabled={sending}
-                        onChange={(event) => {
-                          const file = event.target.files?.[0];
-                          event.target.value = '';
-                          if (!file) return;
-                          if (!file.size || file.size > MAX_MEDIA_BYTES) {
-                            setError('El archivo debe pesar entre 1 byte y 3 MB.');
-                            return;
-                          }
-                          const isAudio =
-                            file.type.startsWith('audio/') ||
-                            /\.(mp3|ogg|m4a|aac)$/i.test(file.name);
-                          if (isAudio && draft.trim()) {
-                            setError(
-                              'Los audios se envían sin leyenda. Enviá o quitá el texto antes de adjuntar un audio.',
-                            );
-                            return;
-                          }
-                          if (draft.length > 1024) {
-                            setError(
-                              'La leyenda de un archivo admite hasta 1024 caracteres. Acortá el texto antes de adjuntarlo.',
-                            );
-                            return;
-                          }
-                          setAttachment(file);
-                          nonce.current = null;
-                          setError('');
-                        }}
-                      />
-                      <Button
+                    <input
+                      ref={fileInput}
+                      tabIndex={-1}
+                      type="file"
+                      className="sr-only"
+                      aria-label="Archivo adjunto"
+                      accept={MEDIA_ACCEPT}
+                      disabled={sending}
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        event.target.value = '';
+                        if (!file) return;
+                        if (!file.size || file.size > MAX_MEDIA_BYTES) {
+                          setError('El archivo debe pesar entre 1 byte y 3 MB.');
+                          return;
+                        }
+                        const isAudio =
+                          file.type.startsWith('audio/') || /\.(mp3|ogg|m4a|aac)$/i.test(file.name);
+                        if (isAudio && draft.trim()) {
+                          setError(
+                            'Los audios se envían sin leyenda. Enviá o quitá el texto antes de adjuntar un audio.',
+                          );
+                          return;
+                        }
+                        if (draft.length > 1024) {
+                          setError(
+                            'La leyenda de un archivo admite hasta 1024 caracteres. Acortá el texto antes de adjuntarlo.',
+                          );
+                          return;
+                        }
+                        chooseAttachment(file);
+                        nonce.current = null;
+                        setError('');
+                      }}
+                    />
+                  )}
+                  {attachment && (
+                    <div className="composer-file-preview">
+                      <span className="composer-file-thumb">
+                        {attachmentPreview ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={attachmentPreview} alt="Vista previa del adjunto" />
+                        ) : (
+                          <FileText size={23} />
+                        )}
+                      </span>
+                      <span>
+                        <strong>{attachment.name}</strong>
+                        <small>
+                          {mediaSizeLabel(attachment.size)} ·{' '}
+                          {audioAttachment ? 'Audio sin leyenda' : 'Agregá una leyenda si querés'}
+                        </small>
+                      </span>
+                      <button
                         type="button"
-                        variant="outline"
+                        disabled={sending}
+                        className="composer-icon"
+                        aria-label="Quitar adjunto"
+                        title="Quitar adjunto"
+                        onClick={() => {
+                          clearAttachment();
+                          nonce.current = null;
+                        }}
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+                  )}
+                  <div className="composer-row">
+                    {mode === 'message' && (
+                      <button
+                        type="button"
+                        className="composer-icon composer-clip"
+                        aria-label="Adjuntar archivo"
+                        title="Adjuntar archivo · Hasta 3 MB"
                         disabled={sending}
                         onClick={() => fileInput.current?.click()}
                       >
-                        <Paperclip size={15} />
-                        Adjuntar archivo
-                      </Button>
-                      {attachment ? (
-                        <span className="selected-attachment">
-                          <strong>{attachment.name}</strong>
-                          <small>{mediaSizeLabel(attachment.size)}</small>
-                          <button
-                            type="button"
-                            disabled={sending}
-                            aria-label="Quitar adjunto"
-                            onClick={() => {
-                              setAttachment(null);
-                              nonce.current = null;
-                            }}
-                          >
-                            <X size={15} />
-                          </button>
-                        </span>
-                      ) : (
-                        <span>Imágenes, audio, video y documentos · Hasta 3 MB</span>
-                      )}
-                      {attachment && (
-                        <small>
-                          Podés agregar una leyenda de hasta 1024 caracteres. Los audios se envían
-                          sin leyenda.
-                        </small>
-                      )}
+                        <Paperclip size={22} />
+                      </button>
+                    )}
+                    <div className="composer-field">
+                      <label className="sr-only" htmlFor="chat-draft">
+                        {mode === 'note' ? 'Nota interna' : 'Mensaje de WhatsApp'}
+                      </label>
+                      <textarea
+                        id="chat-draft"
+                        ref={draftInput}
+                        rows={1}
+                        value={draft}
+                        maxLength={mode === 'note' ? 2000 : attachment ? 1024 : 4096}
+                        disabled={sending || audioAttachment}
+                        onChange={(event) => {
+                          setDraft(event.target.value);
+                          nonce.current = null;
+                          event.target.style.height = 'auto';
+                          event.target.style.height = `${Math.min(event.target.scrollHeight, 120)}px`;
+                        }}
+                        onKeyDown={(event) => {
+                          if (
+                            event.key === 'Enter' &&
+                            !event.shiftKey &&
+                            !event.nativeEvent.isComposing &&
+                            !window.matchMedia('(pointer: coarse)').matches
+                          ) {
+                            event.preventDefault();
+                            event.currentTarget.form?.requestSubmit();
+                          }
+                        }}
+                        placeholder={
+                          mode === 'note'
+                            ? 'Escribí una nota para tu equipo…'
+                            : audioAttachment
+                              ? 'Audio listo para enviar'
+                              : 'Escribí un mensaje…'
+                        }
+                      />
                     </div>
-                  )}
-                  <div className="composer-bottom">
-                    <span>
-                      {mode === 'note'
-                        ? 'Solo visible para el equipo. No se envía por WhatsApp.'
-                        : 'El mensaje quedará en cola hasta que Meta confirme el envío.'}
-                    </span>
-                    <Button
+                    <button
                       type="submit"
+                      className="composer-send"
+                      aria-label={mode === 'note' ? 'Guardar nota' : 'Enviar'}
+                      title={mode === 'note' ? 'Guardar nota' : 'Enviar'}
                       disabled={sending || (!draft.trim() && !(mode === 'message' && attachment))}
                     >
-                      {mode === 'note' ? <StickyNote size={15} /> : <Send size={15} />}{' '}
-                      {sending ? 'Guardando…' : mode === 'note' ? 'Guardar nota' : 'Enviar'}
-                    </Button>
+                      {sending ? (
+                        <LoaderCircle size={21} className="attachment-spinner" />
+                      ) : mode === 'note' ? (
+                        <StickyNote size={20} />
+                      ) : (
+                        <Send size={21} />
+                      )}
+                    </button>
                   </div>
+                  {mode === 'note' && (
+                    <p className="composer-private-hint">
+                      <StickyNote size={11} />
+                      Solo tu equipo puede ver esta nota.
+                    </p>
+                  )}
                 </>
               )}
             </form>

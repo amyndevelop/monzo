@@ -602,8 +602,12 @@ test('bandeja: adjuntos reales en historial, carga a pedido, audio/video, descar
   expect(requests).toHaveLength(0);
   await page.getByRole('button', { name: 'Ver imagen', exact: true }).click();
   await expect(page.getByRole('img', { name: 'foto.png' })).toBeVisible();
+  await page.getByRole('button', { name: 'Ampliar imagen', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Vista de imagen' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: 'Vista de imagen' })).toBeHidden();
   await page.getByRole('button', { name: 'Escuchar audio', exact: true }).click();
-  await expect(page.getByLabel('Audio de la conversación')).toBeVisible();
+  await expect(page.getByRole('slider', { name: 'Posición del audio' })).toBeVisible();
   await expect
     .poll(() =>
       page
@@ -611,6 +615,28 @@ test('bandeja: adjuntos reales en historial, carga a pedido, audio/video, descar
         .evaluate((element: HTMLAudioElement) => element.readyState),
     )
     .toBeGreaterThanOrEqual(1);
+  await page.getByRole('button', { name: 'Velocidad del audio: 1x', exact: true }).click();
+  await expect
+    .poll(() =>
+      page
+        .getByLabel('Audio de la conversación')
+        .evaluate((element: HTMLAudioElement) => element.playbackRate),
+    )
+    .toBe(1.5);
+  await expect(page.getByRole('button', { name: 'Reproducir audio', exact: true })).toBeVisible();
+  await page.getByRole('slider', { name: 'Posición del audio' }).focus();
+  await page.keyboard.press('ArrowRight');
+  await expect
+    .poll(() =>
+      page
+        .getByLabel('Audio de la conversación')
+        .evaluate((element: HTMLAudioElement) => element.currentTime),
+    )
+    .toBeGreaterThan(0);
+  await page.getByRole('log', { name: 'Historial de mensajes' }).evaluate((element) => {
+    element.scrollTop = 0;
+  });
+  await page.screenshot({ path: testInfo.outputPath('media-chat-redesign.png'), fullPage: true });
   await page.getByRole('button', { name: 'Ver video', exact: true }).click();
   await expect(page.getByLabel('Video de la conversación')).toBeVisible();
   await expect
@@ -630,7 +656,13 @@ test('bandeja: adjuntos reales en historial, carga a pedido, audio/video, descar
     .getByLabel('Archivo adjunto', { exact: true })
     .setInputFiles({ name: 'foto.png', mimeType: 'image/png', buffer: png });
   await expect(page.getByRole('button', { name: 'Quitar adjunto' })).toBeVisible();
+  await expect(page.getByRole('img', { name: 'Vista previa del adjunto' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Enviar', exact: true })).toBeEnabled();
+  const composer = page.getByLabel('Mensaje de WhatsApp', { exact: true });
+  await composer.fill('Una foto');
+  await composer.press('Shift+Enter');
+  await composer.pressSequentially('Para vos');
+  await expect(composer).toHaveValue('Una foto\nPara vos');
   await page.getByRole('button', { name: 'Enviar', exact: true }).click();
   await expect(page.getByRole('alert').filter({ hasText: 'TEST_NETWORK_DISABLED' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Quitar adjunto' })).toBeVisible();
