@@ -18,13 +18,17 @@ Cloud API oficial, webhook firmado, recepción idempotente, contactos, bandeja, 
 
 El usuario autorizó continuar el desarrollo de la siguiente fase tras revisar su alcance. Se implementaron imágenes, audio, video y documentos, con apertura/descarga privada y envío por la cola actual. Usa almacenamiento de Meta y un límite de 3 MiB por archivo, sin servicios adicionales. El usuario confirmó la migración de Neon con neondb | 4 | 5. Publicada mediante 4f0e20e; el usuario confirmó que los adjuntos funcionan en producción. Se ajusta la presentación del chat a su pedido. Ver `docs/phase-4.md`.
 
-## Fase 5 · Plantillas — integrada para despliegue
+## Fase 5 · Plantillas — publicada y confirmada
 
-El usuario autorizó esta fase y estableció UX/UI como requisito permanente. Catálogo por cuenta sincronizado con Meta, selección dentro del chat, variables, vista previa, encabezados de archivo y envío fuera de las 24 horas con validación previa. El usuario confirmó la sexta migración de Neon con neondb | 1 | 2 | 4 | 6. Implementación integrada para despliegue desde main; pendientes Ready de Vercel y prueba real del catálogo/envío. Ver `docs/phase-5.md`.
+El usuario autorizó esta fase y estableció UX/UI como requisito permanente. Catálogo por cuenta sincronizado con Meta, selección dentro del chat, variables, vista previa, encabezados de archivo y envío fuera de las 24 horas con validación previa. El usuario confirmó la sexta migración de Neon con neondb | 1 | 2 | 4 | 6. El usuario confirmó actualización del catálogo y envío real tras asignar al usuario del sistema el acceso a Test Messaging Account, además de Test WhatsApp Account. Ver `docs/phase-5.md`.
+
+## Fase 6 · Agentes IA con Gemini — desarrollo autorizado
+
+El usuario eligió el nivel gratuito para pruebas. Primera entrega: laboratorio por empresa con instrucciones, conocimientos ficticios, pausa, límites de intentos y respuestas de prueba. Las condiciones de Google excluyen datos personales/confidenciales del servicio gratuito: no se carga historial real ni se responde automáticamente en WhatsApp. La asistencia con datos reales y automatización se definirán aparte. Requiere séptima migración y GEMINI_API_KEY de servidor; no se publica antes de confirmar Neon. Ver docs/phase-6.md.
 
 ## Fases posteriores · Por definir y autorizar
 
-1. Agentes IA, conocimientos, presupuestos de consumo y escalamiento.
+1. Completar agentes IA: asistencia con datos reales según tratamiento contratado, automatización y escalamiento.
 2. Automatizaciones y herramientas externas sobre el worker.
 3. Onboarding comercial de canales/Embedded Signup según requisitos de Meta.
 4. Analíticas verificables, CRM comercial, suscripciones y facturación.

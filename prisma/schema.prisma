@@ -44,6 +44,7 @@ model Tenant {
   messages          Message[]
   webhookEvents     WhatsappWebhookEvent[]
   conversationNotes ConversationNote[]
+  aiAgent           AiAgent?
   whatsappTemplates WhatsappTemplate[]
 }
 
@@ -330,4 +331,18 @@ model WorkerHeartbeat {
   id              String   @id
   seenAt          DateTime
   outboundEnabled Boolean  @default(false)
+}
+
+model AiAgent {
+  id           String   @id @default(cuid())
+  tenantId     String   @unique
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  name         String   @default("Asistente de prueba")
+  instructions String   @default("")
+  knowledge    String   @default("")
+  enabled      Boolean  @default(false)
+  dailyLimit   Int      @default(20)
+  revision     Int      @default(1)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }
