@@ -356,3 +356,7 @@ PR #5 integrado en main mediante ab817f4. Vercel confirmó ambos despliegues de 
 Captura de respuestas, variables por conversación, comparaciones y destinos Sí/No, mensajes personalizados, simulador compartido y consulta de respuestas desde el chat. Sin nuevas migraciones, secretos o servicios; no utiliza Gemini. Estado y límites en docs/phase-8.md.
 
 Validación: **172/172** generales, repetición final **32/32** automatizaciones y **18/18** QStash. Compilación webpack final, tipos, lint y formato aprobados. Capturas revisadas en escritorio/móvil de captura, simulador y panel de respuestas, con foco, borrador y compositor preservados. Meta y QStash usan transportes de prueba explícitos. Los dos previews finalizaron correctamente; se prepara la integración del PR #6. No se modifica ni activa automáticamente el árbol del usuario.
+
+## Fase 8 publicada
+
+PR #6 integrado mediante 6b002958005c463c5e7fe93f4d27c9eea0c1a3a3. Vercel confirmó estado success para monzo y monzo-v sobre ese commit. No requirió migraciones ni secretos nuevos. Esta confirmación verifica el despliegue; no atribuye al entorno una prueba con el teléfono real del usuario.

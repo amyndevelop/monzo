@@ -30,9 +30,13 @@ El usuario eligió el nivel gratuito para pruebas. Primera entrega: laboratorio 
 
 Árbol visual por número, preguntas con botones/listas, respuestas finales y derivación al equipo. Borradores separados de la publicación, simulador local, pausa y reanudación explícitas en el chat. No depende de Gemini ni activa IA paga. Las conversaciones existentes permanecen bajo control humano hasta reanudarlas. El usuario confirmó la octava migración de Neon con neondb | 1 | 3 | 4 | 8. Integrada mediante el PR #5; despliegues de producción confirmados en ambos proyectos. El usuario indicó continuar. Ver docs/phase-7.md.
 
-## Fase 8 · Flujos avanzados — implementada
+## Fase 8 · Flujos avanzados — publicada
 
-El usuario eligió guardar respuestas, variables y condiciones sobre los árboles actuales. No depende de Gemini ni de servicios nuevos. Ver docs/phase-8.md.
+El usuario eligió guardar respuestas, variables y condiciones sobre los árboles actuales. Integrada mediante el PR #6 en main (6b002958), con ambos despliegues de producción confirmados. No depende de Gemini ni de servicios nuevos. Ver docs/phase-8.md.
+
+## Fase 9 · Analíticas operativas — en desarrollo
+
+El usuario eligió analíticas de conversaciones, mensajes y resultados de flujos. Informe por período y canal, gráfico diario, estados actuales y CSV de cantidades. Sin servicios ni migraciones nuevas. Ver docs/phase-9.md.
 
 ## Fases posteriores · Por definir y autorizar
 
