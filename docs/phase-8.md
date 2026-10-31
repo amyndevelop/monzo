@@ -9,3 +9,7 @@ Las respuestas quedan en el estado JSON de la conversación, dentro de su empres
 El primer mensaje inicia la pregunta, no se captura como respuesta. Los botones antiguos no se aceptan como texto de captura. Tras tres respuestas inválidas se deriva al equipo; se conservan idempotencia, versión, ventana de atención y límites de envío de fase 7. Pausar o responder manualmente conserva el estado para revisión; reanudar comienza un recorrido nuevo.
 
 El editor conserva el borrador ante errores y explica sintaxis, destinos, validaciones y límites. El simulador permite introducir respuestas ficticias y ejecuta las mismas comparaciones y sustituciones del servidor, sin enviar mensajes. Prueba sugerida: guardar nombre, guardar consulta, evaluar si contiene «horario», responder «{{nombre}}, abrimos de 9 a 18» o derivar al equipo.
+
+## Verificación
+
+172/172 pruebas generales, repetición final de 32/32 de automatizaciones y 18/18 QStash. Compilación webpack final, tipos, lint y formato aprobados. Se comprobaron captura durable, envío de la pregunta con transporte Meta inyectado, aislamiento, reinicio, derivación, unión de caminos y referencias prematuras. Capturas de escritorio y móvil revisadas: pregunta de texto, recorrido personalizado, respuestas guardadas y compositor visible con borrador conservado. Las pruebas no envían mensajes reales a Meta.

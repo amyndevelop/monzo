@@ -350,3 +350,9 @@ reanudarse expresamente después de publicar su flujo para probarlo con el telé
 ## Fase 7 publicada y fase 8 elegida
 
 PR #5 integrado en main mediante ab817f4. Vercel confirmó ambos despliegues de producción. El usuario indicó continuar y eligió guardar respuestas, variables y condiciones como siguiente fase. No se atribuye a esta comprobación un envío externo observado por el entorno.
+
+## Fase 8 · Entrega validada
+
+Captura de respuestas, variables por conversación, comparaciones y destinos Sí/No, mensajes personalizados, simulador compartido y consulta de respuestas desde el chat. Sin nuevas migraciones, secretos o servicios; no utiliza Gemini. Estado y límites en docs/phase-8.md.
+
+Validación: **172/172** generales, repetición final **32/32** automatizaciones y **18/18** QStash. Compilación webpack final, tipos, lint y formato aprobados. Capturas revisadas en escritorio/móvil de captura, simulador y panel de respuestas, con foco, borrador y compositor preservados. Meta y QStash usan transportes de prueba explícitos. Los dos previews finalizaron correctamente; se prepara la integración del PR #6. No se modifica ni activa automáticamente el árbol del usuario.

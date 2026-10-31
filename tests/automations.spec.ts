@@ -612,6 +612,7 @@ test('UI avanzada: captura, condición y variables en simulador con teclado', as
   await trigger.click();
   const dialog = page.getByRole('dialog', { name: 'Probar recorrido' });
   await dialog.getByLabel('Respuesta de prueba').fill('Ana');
+  await page.screenshot({ path: `work/advanced-capture-${testInfo.project.name}.png` });
   await dialog.getByRole('button', { name: 'Continuar', exact: true }).click();
   await expect(dialog.getByText('Hola Ana, ¿qué necesitás?', { exact: true })).toBeVisible();
   await dialog.getByLabel('Respuesta de prueba').fill('horarios');
@@ -624,4 +625,16 @@ test('UI avanzada: captura, condición y variables en simulador con teclado', as
   });
   await page.keyboard.press('Escape');
   await expect(trigger).toBeFocused();
+  await receive(f);
+  const captured = await receive(f, 'Ana');
+  await page.goto('/dashboard/conversaciones?conversation=' + captured.conversation.id);
+  const composer = page.getByLabel('Mensaje de WhatsApp', { exact: true });
+  await composer.fill('Borrador humano');
+  await page.getByText('Respuestas guardadas (1)', { exact: true }).click();
+  await expect(page.locator('.flow-chat-control dd').filter({ hasText: 'Ana' })).toBeVisible();
+  await expect(composer).toHaveValue('Borrador humano');
+  const box = await composer.boundingBox();
+  expect(box!.y + box!.height).toBeLessThanOrEqual(await page.evaluate(() => innerHeight));
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: `work/advanced-chat-${testInfo.project.name}.png` });
 });
