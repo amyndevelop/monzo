@@ -79,3 +79,7 @@ La intervención humana cancela respuestas automáticas no reclamadas y pausa el
 recorrido. Las conversaciones previas a la migración comienzan pausadas. El editor
 valida un grafo sin ciclos, el simulador es local y publicar no envía mensajes por
 sí mismo. No se usan Gemini ni herramientas externas. Ver docs/phase-7.md.
+
+### Variables del recorrido guiado
+
+La fase 8 reutiliza automationState JSON para respuestas de hasta 120 caracteres, aisladas por conversación. Los nodos capture guardan una variable y avanzan por un destino; condition resuelve Sí/No sin generar mensajes intermedios. definition.ts comparte comparaciones y sustitución entre simulador y runtime. La validación intersecta las variables disponibles de todos los predecesores del DAG antes de permitir lecturas. Cambios de publicación, reinicio y reanudación invalidan el estado anterior. No agrega evaluación de código, llamadas externas ni uso de Gemini.

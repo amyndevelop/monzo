@@ -495,3 +495,146 @@ test('UI: tomar atención y reanudar conservan borrador y compositor', async ({
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: `work/flows-chat-${testInfo.project.name}.png`, fullPage: true });
 });
+
+const advancedGraph = (): FlowGraph => ({
+  name: 'Consulta guiada',
+  start: 'nombre',
+  nodes: [
+    {
+      id: 'nombre',
+      label: 'Nombre',
+      kind: 'capture',
+      variable: 'nombre',
+      text: '¿Cómo te llamás?',
+      options: [{ id: 'seguir', label: 'Continuar', next: 'tipo' }],
+    },
+    {
+      id: 'tipo',
+      label: 'Consulta',
+      kind: 'capture',
+      variable: 'consulta',
+      text: 'Hola {{nombre}}, ¿qué necesitás?',
+      options: [{ id: 'seguir', label: 'Continuar', next: 'decision' }],
+    },
+    {
+      id: 'decision',
+      label: 'Evaluar',
+      kind: 'condition',
+      variable: 'consulta',
+      operator: 'contains',
+      value: 'horario',
+      text: '',
+      options: [
+        { id: 'si', label: 'Sí', next: 'respuesta' },
+        { id: 'no', label: 'No', next: 'humano' },
+      ],
+    },
+    {
+      id: 'respuesta',
+      label: 'Horario',
+      kind: 'message',
+      text: '{{nombre}}, abrimos de 9 a 18.',
+      options: [],
+    },
+    {
+      id: 'humano',
+      label: 'Equipo',
+      kind: 'handoff',
+      text: '{{nombre}}, el equipo revisará tu consulta.',
+      options: [],
+    },
+  ],
+});
+
+test('variables: captura durable, condición, aislamiento, reinicio y derivación', async () => {
+  expect(flowIssues(advancedGraph())).toEqual([]);
+  const f = await published(advancedGraph());
+  const first = await receive(f);
+  expect(first.message?.text).toBe('¿Cómo te llamás?');
+  await processOutbound(db, first.message!.id, accepted);
+  expect((await db.message.findUniqueOrThrow({ where: { id: first.message!.id } })).status).toBe(
+    'SENT',
+  );
+  const named = await receive(f, 'Ána');
+  expect(named.message?.text).toBe('Hola Ána, ¿qué necesitás?');
+  expect(named.conversation.automationState).toMatchObject({ variables: { nombre: 'Ána' } });
+  const result = await receive(f, 'HORÁRIOS');
+  expect(result.message?.text).toContain('Ána, abrimos de 9 a 18.');
+  expect((await receive(f, 'MENÚ')).conversation.automationState).toMatchObject({ variables: {} });
+  await receive(f, 'Luis');
+  const human = await receive(f, 'Necesito ayuda');
+  expect(human.message?.text).toBe('Luis, el equipo revisará tu consulta.');
+  expect(human.conversation.automationState).toMatchObject({ status: 'handoff' });
+  const other = await published(advancedGraph());
+  expect((await receive(other)).message?.text).toBe('¿Cómo te llamás?');
+});
+
+test('variables: rechaza lecturas prematuras y deriva después de tres capturas inválidas', async () => {
+  const invalid = advancedGraph();
+  invalid.nodes[0].text = 'Hola {{nombre}}';
+  expect(flowIssues(invalid).join(' ')).toContain('debe guardarse antes');
+  const joined = advancedGraph();
+  joined.start = 'rama';
+  joined.nodes.push({
+    id: 'rama',
+    label: 'Rama',
+    kind: 'menu',
+    text: 'Elegí',
+    options: [
+      { id: 'a', label: 'A', next: 'nombre' },
+      { id: 'b', label: 'B', next: 'tipo' },
+    ],
+  });
+  expect(flowIssues(joined).join(' ')).toContain('debe guardarse antes');
+  const duplicate = advancedGraph();
+  duplicate.nodes.push({
+    ...duplicate.nodes[0],
+    options: [{ id: 'x', label: 'X', next: 'nombre' }],
+  });
+  expect(flowIssues(duplicate).join(' ')).toContain('repetidos');
+  const f = await published(advancedGraph());
+  await receive(f);
+  for (let i = 0; i < 2; i++)
+    expect((await receive(f, 'x'.repeat(121))).message?.text).toContain('hasta 120');
+  expect((await receive(f, 'x'.repeat(121))).conversation.automationState).toMatchObject({
+    status: 'handoff',
+  });
+});
+
+test('UI avanzada: captura, condición y variables en simulador con teclado', async ({
+  page,
+}, testInfo) => {
+  const f = await published(advancedGraph());
+  await f.api.post('/api/workspaces/active', { data: { tenantId: f.tenant.id } });
+  await page.context().addCookies((await f.api.storageState()).cookies);
+  await page.goto('/dashboard/automatizaciones');
+  const trigger = page.getByRole('button', { name: 'Probar recorrido' });
+  await trigger.click();
+  const dialog = page.getByRole('dialog', { name: 'Probar recorrido' });
+  await dialog.getByLabel('Respuesta de prueba').fill('Ana');
+  await page.screenshot({ path: `work/advanced-capture-${testInfo.project.name}.png` });
+  await dialog.getByRole('button', { name: 'Continuar', exact: true }).click();
+  await expect(dialog.getByText('Hola Ana, ¿qué necesitás?', { exact: true })).toBeVisible();
+  await dialog.getByLabel('Respuesta de prueba').fill('horarios');
+  await dialog.getByRole('button', { name: 'Continuar', exact: true }).click();
+  await expect(dialog.getByText(/Ana, abrimos de 9 a 18/)).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({
+    path: `work/advanced-flows-${testInfo.project.name}.png`,
+    fullPage: true,
+  });
+  await page.keyboard.press('Escape');
+  await expect(trigger).toBeFocused();
+  await receive(f);
+  const captured = await receive(f, 'Ana');
+  await page.goto('/dashboard/conversaciones?conversation=' + captured.conversation.id);
+  const composer = page.getByLabel('Mensaje de WhatsApp', { exact: true });
+  await composer.fill('Borrador humano');
+  await page.getByText('Respuestas guardadas (1)', { exact: true }).click();
+  await expect(page.locator('.flow-chat-control dd').filter({ hasText: 'Ana' })).toBeVisible();
+  await expect(composer).toHaveValue('Borrador humano');
+  const box = await composer.boundingBox();
+  expect(box!.y + box!.height).toBeLessThanOrEqual(await page.evaluate(() => innerHeight));
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: `work/advanced-chat-${testInfo.project.name}.png` });
+});

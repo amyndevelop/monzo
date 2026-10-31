@@ -67,6 +67,19 @@ export function ConversationFlowControl({
         <small>Responder o asignar un operador también pausa el flujo.</small>
       )}
       {human && blocked && <small>{blocked}</small>}
+      {flow.variables && Object.keys(flow.variables).length > 0 && (
+        <details>
+          <summary>Respuestas guardadas ({Object.keys(flow.variables).length})</summary>
+          <dl>
+            {Object.entries(flow.variables).map(([key, value]) => (
+              <div key={key}>
+                <dt>{key}</dt>
+                <dd>{value}</dd>
+              </div>
+            ))}
+          </dl>
+        </details>
+      )}
       {flow.reason && <small>{flow.reason}</small>}
       {error && <small role="alert">{error}</small>}
       {notice && <small role="status">{notice}</small>}

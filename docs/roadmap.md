@@ -26,9 +26,13 @@ El usuario autorizó esta fase y estableció UX/UI como requisito permanente. Ca
 
 El usuario eligió el nivel gratuito para pruebas. Primera entrega: laboratorio por empresa con instrucciones, conocimientos ficticios, pausa, límites de intentos y respuestas de prueba. Las condiciones de Google excluyen datos personales/confidenciales del servicio gratuito: no se carga historial real ni se responde automáticamente en WhatsApp. La asistencia con datos reales y automatización se definirán aparte. El usuario confirmó la séptima migración de Neon con neondb | 1 | 10 | 7. Publicada tras configurar GEMINI_API_KEY; el usuario confirmó una respuesta real usando conocimientos ficticios. La revisión de Gemini pago no activó facturación ni el uso de conversaciones reales. Ver docs/phase-6.md.
 
-## Fase 7 · Automatizaciones guiadas — desarrollo autorizado
+## Fase 7 · Automatizaciones guiadas — publicada
 
-Árbol visual por número, preguntas con botones/listas, respuestas finales y derivación al equipo. Borradores separados de la publicación, simulador local, pausa y reanudación explícitas en el chat. No depende de Gemini ni activa IA paga. Las conversaciones existentes permanecen bajo control humano hasta reanudarlas. El usuario confirmó la octava migración de Neon con neondb | 1 | 3 | 4 | 8. Lista para publicar; pendiente verificar producción y un recorrido real de botones/listas. Ver docs/phase-7.md.
+Árbol visual por número, preguntas con botones/listas, respuestas finales y derivación al equipo. Borradores separados de la publicación, simulador local, pausa y reanudación explícitas en el chat. No depende de Gemini ni activa IA paga. Las conversaciones existentes permanecen bajo control humano hasta reanudarlas. El usuario confirmó la octava migración de Neon con neondb | 1 | 3 | 4 | 8. Integrada mediante el PR #5; despliegues de producción confirmados en ambos proyectos. El usuario indicó continuar. Ver docs/phase-7.md.
+
+## Fase 8 · Flujos avanzados — implementada
+
+El usuario eligió guardar respuestas, variables y condiciones sobre los árboles actuales. No depende de Gemini ni de servicios nuevos. Ver docs/phase-8.md.
 
 ## Fases posteriores · Por definir y autorizar
 

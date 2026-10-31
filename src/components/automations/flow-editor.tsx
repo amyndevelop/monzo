@@ -31,6 +31,8 @@ type Accounts = {
 const empty: FlowGraph = { name: '', start: '', nodes: [] };
 const kindLabels = {
   menu: 'Pregunta con opciones',
+  capture: 'Guardar respuesta',
+  condition: 'Evaluar condición',
   message: 'Respuesta final',
   handoff: 'Derivar al equipo',
 };
@@ -263,7 +265,17 @@ function FlowEditor({
           label: `Paso ${graph.nodes.length + 1}`,
           kind,
           text: '',
-          options: kind === 'menu' ? [{ id: 'opcion1', label: '', next: '' }] : [],
+          options:
+            kind === 'menu'
+              ? [{ id: 'opcion1', label: '', next: '' }]
+              : kind === 'capture'
+                ? [{ id: 'continuar', label: 'Continuar', next: '' }]
+                : kind === 'condition'
+                  ? [
+                      { id: 'si', label: 'Sí', next: '' },
+                      { id: 'no', label: 'No', next: '' },
+                    ]
+                  : [],
         },
       ],
     });
@@ -516,7 +528,7 @@ function FlowEditor({
             )}
             <fieldset disabled={!canEdit || graph.nodes.length >= 30} className="flow-add">
               <legend>Agregar paso</legend>
-              {(['menu', 'message', 'handoff'] as const).map((kind) => (
+              {(['menu', 'capture', 'condition', 'message', 'handoff'] as const).map((kind) => (
                 <Button key={kind} type="button" variant="outline" onClick={() => add(kind)}>
                   <Plus size={14} />
                   {kindLabels[kind]}
@@ -562,7 +574,21 @@ function FlowEditor({
                         !confirm('Cambiar el tipo quitará las opciones de este paso. ¿Continuar?')
                       )
                         return;
-                      updateNode({ ...node, kind, options: kind === 'menu' ? node.options : [] });
+                      updateNode({
+                        ...node,
+                        kind,
+                        options:
+                          kind === 'menu'
+                            ? node.options
+                            : kind === 'capture'
+                              ? [{ id: 'continuar', label: 'Continuar', next: '' }]
+                              : kind === 'condition'
+                                ? [
+                                    { id: 'si', label: 'Sí', next: '' },
+                                    { id: 'no', label: 'No', next: '' },
+                                  ]
+                                : [],
+                      });
                     }}
                   >
                     {Object.entries(kindLabels).map(([kind, label]) => (
@@ -573,7 +599,9 @@ function FlowEditor({
                   </select>
                 </label>
                 <label>
-                  Mensaje para el cliente
+                  {node.kind === 'condition'
+                    ? 'Nota del paso (no se envía)'
+                    : 'Mensaje para el cliente'}
                   <textarea
                     rows={5}
                     maxLength={900}
@@ -582,19 +610,88 @@ function FlowEditor({
                     placeholder="Escribí el mensaje que verá en WhatsApp"
                   />
                 </label>
-                <span className="flow-help">{node.text.length} / 900 caracteres</span>
-                {node.kind === 'menu' ? (
+                <span className="flow-help">
+                  {node.text.length} / 900 caracteres. Usá {'{{nombre}}'} para insertar una
+                  respuesta guardada antes. El mensaje resultante se limita a 900 caracteres.
+                </span>
+                {['menu', 'capture', 'condition'].includes(node.kind) ? (
                   <div className="flow-options">
                     <h3>Opciones y destinos</h3>
-                    <p className="flow-help">
-                      Hasta 3 opciones se envían como botones; de 4 a 10, como lista. El cliente
-                      también puede responder con el número de opción.
-                    </p>
+                    {node.kind !== 'menu' && (
+                      <p className="flow-help">
+                        Este tipo de paso usa destinos fijos: no se agregan ni se quitan opciones.
+                      </p>
+                    )}
+                    {node.kind !== 'menu' && (
+                      <>
+                        <label>
+                          Variable
+                          <input
+                            maxLength={40}
+                            value={node.variable ?? ''}
+                            placeholder="Ej.: nombre"
+                            onChange={(event) =>
+                              updateNode({ ...node, variable: event.target.value })
+                            }
+                          />
+                        </label>
+                        {node.kind === 'capture' ? (
+                          <p className="flow-help">
+                            Guarda un texto de hasta 120 caracteres para este recorrido. No pidas
+                            contraseñas, tarjetas ni datos sensibles. MENÚ e INICIO reinician y
+                            borran estas variables.
+                          </p>
+                        ) : (
+                          <>
+                            <label>
+                              Comparación
+                              <select
+                                value={node.operator ?? ''}
+                                onChange={(event) =>
+                                  updateNode({
+                                    ...node,
+                                    operator: event.target.value as FlowNode['operator'],
+                                  })
+                                }
+                              >
+                                <option value="">Elegí una comparación</option>
+                                <option value="equals">Es igual a</option>
+                                <option value="contains">Contiene</option>
+                                <option value="exists">Tiene valor</option>
+                              </select>
+                            </label>
+                            {node.operator !== 'exists' && (
+                              <label>
+                                Valor esperado
+                                <input
+                                  maxLength={120}
+                                  value={node.value ?? ''}
+                                  onChange={(event) =>
+                                    updateNode({ ...node, value: event.target.value })
+                                  }
+                                />
+                              </label>
+                            )}
+                            <p className="flow-help">
+                              El primer destino se usa si se cumple; el segundo, si no. No distingue
+                              mayúsculas ni tildes. Este paso no envía un mensaje.
+                            </p>
+                          </>
+                        )}
+                      </>
+                    )}
+                    {node.kind === 'menu' && (
+                      <p className="flow-help">
+                        Hasta 3 opciones se envían como botones; de 4 a 10, como lista. El cliente
+                        también puede responder con el número de opción.
+                      </p>
+                    )}
                     {node.options.map((option, index) => (
                       <div className="flow-option" key={option.id}>
                         <label>
-                          Opción {index + 1}
+                          {node.kind === 'menu' ? `Opción ${index + 1}` : option.label}
                           <input
+                            readOnly={node.kind !== 'menu'}
                             maxLength={20}
                             value={option.label}
                             placeholder="Ej.: Consultar horarios"
@@ -609,7 +706,9 @@ function FlowEditor({
                           />
                         </label>
                         <label>
-                          Destino de opción {index + 1}
+                          {node.kind === 'menu'
+                            ? `Destino de opción ${index + 1}`
+                            : `Destino: ${option.label}`}
                           <select
                             value={option.next}
                             onChange={(event) =>
@@ -636,6 +735,12 @@ function FlowEditor({
                           variant="ghost"
                           size="icon"
                           aria-label={`Quitar opción ${index + 1}`}
+                          disabled={node.kind !== 'menu'}
+                          title={
+                            node.kind !== 'menu'
+                              ? 'Este tipo de paso usa destinos fijos.'
+                              : undefined
+                          }
                           onClick={() =>
                             updateNode({
                               ...node,
@@ -650,7 +755,14 @@ function FlowEditor({
                     <Button
                       type="button"
                       variant="outline"
-                      disabled={node.options.length >= 10}
+                      disabled={node.kind !== 'menu' || node.options.length >= 10}
+                      title={
+                        node.kind !== 'menu'
+                          ? 'Este tipo de paso usa destinos fijos.'
+                          : node.options.length >= 10
+                            ? 'El máximo es de 10 opciones.'
+                            : undefined
+                      }
                       onClick={() =>
                         updateNode({
                           ...node,

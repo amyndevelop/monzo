@@ -4854,6 +4854,7 @@ svg {
   color: #607d87;
 }
 .flow-chat-control {
+  position: relative;
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -4907,4 +4908,51 @@ svg {
   .flow-back-tree {
     display: block;
   }
+}
+
+.flow-simulator form,
+.flow-simulator form label {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  font-size: 14px;
+}
+.flow-simulator form input {
+  width: 100%;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #c8dfe2;
+  border-radius: 10px;
+  background: white;
+}
+.flow-simulator form input:focus-visible {
+  outline: 2px solid #008d98;
+  outline-offset: 2px;
+}
+.flow-chat-control details {
+  position: static;
+}
+.flow-chat-control summary {
+  cursor: pointer;
+}
+.flow-chat-control dl {
+  position: absolute;
+  z-index: 20;
+  top: 100%;
+  left: 10px;
+  width: min(280px, calc(100vw - 32px));
+  max-height: 180px;
+  overflow: auto;
+  overflow-wrap: anywhere;
+  background: white;
+  border: 1px solid #c8dfe2;
+  border-radius: 10px;
+  padding: 12px;
+  box-shadow: 0 8px 24px #102c3520;
+}
+.flow-chat-control dt {
+  font-weight: 600;
+}
+.flow-chat-control dd {
+  margin-bottom: 8px;
 }
