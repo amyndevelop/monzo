@@ -1,0 +1,230 @@
+{
+  "schemaVersion": 2,
+  "name": "Ejemplo · Selección y confirmación",
+  "start": "red",
+  "variables": [
+    {
+      "identifier": "red_social",
+      "name": "red social",
+      "type": "text",
+      "description": "Ejemplo editable con datos ficticios",
+      "defaultValue": null,
+      "scope": "execution",
+      "currency": "ARS"
+    },
+    {
+      "identifier": "servicio",
+      "name": "servicio",
+      "type": "text",
+      "description": "Ejemplo editable con datos ficticios",
+      "defaultValue": null,
+      "scope": "execution",
+      "currency": "ARS"
+    },
+    {
+      "identifier": "cantidad",
+      "name": "cantidad",
+      "type": "integer",
+      "description": "Ejemplo editable con datos ficticios",
+      "defaultValue": null,
+      "scope": "execution",
+      "currency": "ARS"
+    },
+    {
+      "identifier": "precio",
+      "name": "precio",
+      "type": "currency",
+      "description": "Ejemplo editable con datos ficticios",
+      "defaultValue": null,
+      "scope": "execution",
+      "currency": "ARS"
+    },
+    {
+      "identifier": "estado_pedido",
+      "name": "estado pedido",
+      "type": "text",
+      "description": "Ejemplo editable con datos ficticios",
+      "defaultValue": null,
+      "scope": "execution",
+      "currency": "ARS"
+    },
+    {
+      "identifier": "copia_servicio",
+      "name": "copia servicio",
+      "type": "text",
+      "description": "Ejemplo editable con datos ficticios",
+      "defaultValue": null,
+      "scope": "execution",
+      "currency": "ARS"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "red",
+      "label": "Red social",
+      "kind": "menu",
+      "variable": "red_social",
+      "text": "Ejemplo ficticio: ¿qué red social elegís?",
+      "options": [
+        {
+          "id": "red0",
+          "label": "Instagram",
+          "value": "Instagram",
+          "next": "servicio"
+        },
+        {
+          "id": "red1",
+          "label": "Facebook",
+          "value": "Facebook",
+          "next": "servicio"
+        },
+        {
+          "id": "red2",
+          "label": "TikTok",
+          "value": "TikTok",
+          "next": "servicio"
+        }
+      ]
+    },
+    {
+      "id": "servicio",
+      "label": "Servicio",
+      "kind": "menu",
+      "variable": "servicio",
+      "text": "¿Qué servicio querés?",
+      "options": [
+        {
+          "id": "servicio0",
+          "label": "Seguidores",
+          "value": "Seguidores",
+          "next": "cantidad"
+        },
+        {
+          "id": "servicio1",
+          "label": "Likes",
+          "value": "Likes",
+          "next": "cantidad"
+        },
+        {
+          "id": "servicio2",
+          "label": "Vistas",
+          "value": "Vistas",
+          "next": "cantidad"
+        }
+      ]
+    },
+    {
+      "id": "cantidad",
+      "label": "Cantidad",
+      "kind": "menu",
+      "variable": "cantidad",
+      "text": "¿Qué cantidad necesitás?",
+      "options": [
+        {
+          "id": "cantidad0",
+          "label": "100",
+          "value": "100",
+          "next": "confirmar",
+          "assignments": [
+            {
+              "variable": "precio",
+              "operation": "set",
+              "value": "1500"
+            },
+            {
+              "variable": "estado_pedido",
+              "operation": "set",
+              "value": "Pendiente de confirmación"
+            }
+          ]
+        },
+        {
+          "id": "cantidad1",
+          "label": "500",
+          "value": "500",
+          "next": "confirmar",
+          "assignments": [
+            {
+              "variable": "precio",
+              "operation": "set",
+              "value": "7700"
+            },
+            {
+              "variable": "estado_pedido",
+              "operation": "set",
+              "value": "Pendiente de confirmación"
+            }
+          ]
+        },
+        {
+          "id": "cantidad2",
+          "label": "1000",
+          "value": "1000",
+          "next": "confirmar",
+          "assignments": [
+            {
+              "variable": "precio",
+              "operation": "set",
+              "value": "15400"
+            },
+            {
+              "variable": "estado_pedido",
+              "operation": "set",
+              "value": "Pendiente de confirmación"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "confirmar",
+      "label": "Confirmar o corregir",
+      "kind": "menu",
+      "text": "Hola, confirmá tu selección:\n\nElegiste {{cantidad}} de {{servicio}} para {{red_social}}.\nImporte de ejemplo: {{precio}}.\n\n¿Es correcto?",
+      "options": [
+        {
+          "id": "si",
+          "label": "Sí, continuar",
+          "next": "guardar"
+        },
+        {
+          "id": "no",
+          "label": "No, modificar",
+          "next": "cantidad"
+        }
+      ]
+    },
+    {
+      "id": "guardar",
+      "label": "Registrar confirmación",
+      "kind": "assign",
+      "text": "",
+      "assignments": [
+        {
+          "variable": "estado_pedido",
+          "operation": "set",
+          "value": "Confirmado"
+        },
+        {
+          "variable": "copia_servicio",
+          "operation": "copy",
+          "value": "servicio"
+        }
+      ],
+      "options": [
+        {
+          "id": "continuar",
+          "label": "Continuar",
+          "next": "fin"
+        }
+      ]
+    },
+    {
+      "id": "fin",
+      "label": "Confirmación final",
+      "kind": "message",
+      "text": "Confirmaste {{cantidad}} de {{servicio}} para {{red_social}}.\nEstado: {{estado_pedido}}.",
+      "options": []
+    }
+  ]
+}

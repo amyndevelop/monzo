@@ -1,4 +1,6 @@
 import 'server-only';
+import { registryRows, mutateVariable } from './variable-registry';
+import { variableDefinition } from './variable-registry';
 import { z } from 'zod';
 import { getDb } from '@/lib/db';
 import { requireTenantAccess } from '@/modules/access/policy';
@@ -39,6 +41,12 @@ export async function getFlow(tenantId: string, accountId: string) {
       })
     : null;
   return {
+    variables: (
+      await getDb().automationVariable.findMany({
+        where: { tenantId },
+        orderBy: { createdAt: 'asc' },
+      })
+    ).map(variableDefinition),
     flow: flow
       ? {
           draft: flow.draft,
@@ -97,4 +105,20 @@ export async function changeConversationFlow(
   return failure(() =>
     controlConversation(getDb(), tenantId, user.id, idSchema.parse(conversationId), action),
   );
+}
+
+export async function getVariables(tenantId: string) {
+  const { membership } = await requireTenantAccess(idSchema.parse(tenantId));
+  return {
+    variables: await registryRows(getDb(), tenantId),
+    canEdit: membership.role !== 'MEMBER',
+  };
+}
+export async function changeVariable(tenantId: string, input: unknown) {
+  const { user } = await requireTenantAccess(idSchema.parse(tenantId), ['OWNER', 'ADMIN']);
+  const result = await failure(() => mutateVariable(getDb(), tenantId, user.id, input));
+  return {
+    ...(await getVariables(tenantId)),
+    ...((input as { action?: string })?.action === 'example' ? { example: result } : {}),
+  };
 }

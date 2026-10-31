@@ -10,8 +10,16 @@ import {
   type FlowGraph,
   type FlowNode,
 } from '@/modules/automations/definition';
+import { VariableManager } from './variable-manager';
+import { VariableSelect, VariableMessage, AssignmentFields } from './variable-fields';
+import {
+  allowedOperators,
+  operators,
+  type VariableDefinition,
+} from '@/modules/automations/variables';
 import { FlowSimulator } from './simulator';
 type FlowData = {
+  variables: VariableDefinition[];
   flow: {
     draft: FlowGraph;
     published: FlowGraph | null;
@@ -33,6 +41,7 @@ const kindLabels = {
   menu: 'Pregunta con opciones',
   capture: 'Guardar respuesta',
   condition: 'Evaluar condición',
+  assign: 'Asignar variable',
   message: 'Respuesta final',
   handoff: 'Derivar al equipo',
 };
@@ -93,11 +102,21 @@ export function AutomationPanel({ tenantId }: { tenantId: string }) {
           <p role="status">Cargando números…</p>
         )
       ) : !accounts.accounts.length ? (
-        <section className="flow-card">
-          <h2>Primero conectá un número</h2>
-          <p>Los flujos se publican por número de WhatsApp.</p>
-          <Link href="/dashboard/canales">Ir a Canales →</Link>
-        </section>
+        <>
+          <VariableManager
+            tenantId={tenantId}
+            graph={empty}
+            canEdit={accounts.canEdit}
+            createRequest={0}
+            onChange={() => {}}
+            onCreated={() => {}}
+          />
+          <section className="flow-card">
+            <h2>Primero conectá un número</h2>
+            <p>Los flujos se publican por número de WhatsApp.</p>
+            <Link href="/dashboard/canales">Ir a Canales →</Link>
+          </section>
+        </>
       ) : (
         <>
           <label className="flow-account">
@@ -157,6 +176,9 @@ function FlowEditor({
       if (matchMedia('(max-width: 1000px)').matches) editorHeading.current?.focus();
     });
   };
+  const [registryRefresh, setRegistryRefresh] = useState(0);
+  const [createRequest, setCreateRequest] = useState(0);
+  const quickNode = useRef('');
   const [graph, setGraph] = useState<FlowGraph>(empty);
   const [selected, setSelected] = useState('');
   const [dirty, setDirty] = useState(false);
@@ -171,7 +193,11 @@ function FlowEditor({
     whatsappRequest<FlowData>(base, 'GET', undefined, controller.signal)
       .then((result) => {
         setData(result);
-        setGraph(result.flow?.draft ?? empty);
+        setGraph({
+          ...(result.flow?.draft ?? empty),
+          variables: result.variables,
+          schemaVersion: 2,
+        });
         setSelected(result.flow?.draft.start ?? '');
       })
       .catch((error) => {
@@ -234,7 +260,7 @@ function FlowEditor({
       setData(result);
       // Pausing the live version must never discard local draft edits.
       if (action === 'save') {
-        setGraph(result.flow!.draft);
+        setGraph({ ...result.flow!.draft, variables: result.variables, schemaVersion: 2 });
         setDirty(false);
         onDirty(false);
       }
@@ -268,7 +294,7 @@ function FlowEditor({
           options:
             kind === 'menu'
               ? [{ id: 'opcion1', label: '', next: '' }]
-              : kind === 'capture'
+              : ['capture', 'assign'].includes(kind)
                 ? [{ id: 'continuar', label: 'Continuar', next: '' }]
                 : kind === 'condition'
                   ? [
@@ -341,6 +367,25 @@ function FlowEditor({
     </section>
   ) : (
     <>
+      <VariableManager
+        tenantId={tenantId}
+        graph={graph}
+        canEdit={canEdit}
+        createRequest={createRequest}
+        refreshKey={registryRefresh + (data.flow?.revision ?? 0)}
+        onChange={(variables) => edit({ ...graph, variables, schemaVersion: 2 })}
+        onCreated={(variable) => {
+          const id = quickNode.current;
+          quickNode.current = '';
+          if (id)
+            setGraph((current) => ({
+              ...current,
+              nodes: current.nodes.map((n) =>
+                n.id === id ? { ...n, variable: variable.identifier } : n,
+              ),
+            }));
+        }}
+      />
       <form
         onSubmit={(event) => {
           event.preventDefault();
@@ -462,6 +507,44 @@ function FlowEditor({
             </p>
           )}
         </div>
+        <Button
+          type="button"
+          variant="outline"
+          disabled={!canEdit}
+          className="variable-example-button"
+          onClick={async () => {
+            if (
+              graph.nodes.length &&
+              !confirm(
+                '¿Reemplazar el borrador por un ejemplo ficticio? La publicación actual no cambia.',
+              )
+            )
+              return;
+            setBusy(true);
+            onBusy(true);
+            setError('');
+            try {
+              const result = await whatsappRequest<{ example: FlowGraph }>(
+                `/api/workspaces/${tenantId}/automation-variables`,
+                'POST',
+                { action: 'example' },
+              );
+              edit(result.example);
+              setRegistryRefresh((n) => n + 1);
+              setSelected(result.example.start);
+              setNotice(
+                'Ejemplo ficticio cargado. Revisá sus textos y valores antes de guardar o publicar.',
+              );
+            } catch (e) {
+              setError(e instanceof Error ? e.message : 'No pudimos cargar el ejemplo.');
+            } finally {
+              setBusy(false);
+              onBusy(false);
+            }
+          }}
+        >
+          Cargar ejemplo de variables y confirmación
+        </Button>
         <div className="flow-columns">
           <section className="flow-card flow-tree-panel">
             <div className="flow-heading">
@@ -480,7 +563,11 @@ function FlowEditor({
                   variant="outline"
                   disabled={!canEdit}
                   onClick={() => {
-                    edit(structuredClone(exampleFlow));
+                    edit({
+                      ...structuredClone(exampleFlow),
+                      variables: graph.variables,
+                      schemaVersion: 2,
+                    });
                     setSelected(exampleFlow.start);
                   }}
                 >
@@ -528,12 +615,14 @@ function FlowEditor({
             )}
             <fieldset disabled={!canEdit || graph.nodes.length >= 30} className="flow-add">
               <legend>Agregar paso</legend>
-              {(['menu', 'capture', 'condition', 'message', 'handoff'] as const).map((kind) => (
-                <Button key={kind} type="button" variant="outline" onClick={() => add(kind)}>
-                  <Plus size={14} />
-                  {kindLabels[kind]}
-                </Button>
-              ))}
+              {(['menu', 'capture', 'condition', 'assign', 'message', 'handoff'] as const).map(
+                (kind) => (
+                  <Button key={kind} type="button" variant="outline" onClick={() => add(kind)}>
+                    <Plus size={14} />
+                    {kindLabels[kind]}
+                  </Button>
+                ),
+              )}
             </fieldset>
             {graph.nodes.length >= 30 && (
               <p className="flow-help">Llegaste al máximo de 30 pasos.</p>
@@ -577,10 +666,13 @@ function FlowEditor({
                       updateNode({
                         ...node,
                         kind,
+                        text: ['condition', 'assign'].includes(kind) ? '' : node.text,
+                        variable: kind === 'assign' ? undefined : node.variable,
+                        assignments: kind === 'assign' ? node.assignments : undefined,
                         options:
                           kind === 'menu'
                             ? node.options
-                            : kind === 'capture'
+                            : ['capture', 'assign'].includes(kind)
                               ? [{ id: 'continuar', label: 'Continuar', next: '' }]
                               : kind === 'condition'
                                 ? [
@@ -598,23 +690,25 @@ function FlowEditor({
                     ))}
                   </select>
                 </label>
-                <label>
-                  {node.kind === 'condition'
-                    ? 'Nota del paso (no se envía)'
-                    : 'Mensaje para el cliente'}
-                  <textarea
-                    rows={5}
-                    maxLength={900}
+                {['condition', 'assign'].includes(node.kind) ? (
+                  <p className="flow-help">
+                    Este paso no envía un mensaje; ejecuta sus operaciones y continúa.
+                  </p>
+                ) : (
+                  <VariableMessage
+                    graph={graph}
                     value={node.text}
-                    onChange={(event) => updateNode({ ...node, text: event.target.value })}
-                    placeholder="Escribí el mensaje que verá en WhatsApp"
+                    onChange={(text) => updateNode({ ...node, text })}
                   />
-                </label>
-                <span className="flow-help">
-                  {node.text.length} / 900 caracteres. Usá {'{{nombre}}'} para insertar una
-                  respuesta guardada antes. El mensaje resultante se limita a 900 caracteres.
-                </span>
-                {['menu', 'capture', 'condition'].includes(node.kind) ? (
+                )}
+                {node.kind === 'assign' && (
+                  <AssignmentFields
+                    definitions={graph.variables ?? []}
+                    items={node.assignments ?? []}
+                    onChange={(assignments) => updateNode({ ...node, assignments })}
+                  />
+                )}
+                {['menu', 'capture', 'condition', 'assign'].includes(node.kind) ? (
                   <div className="flow-options">
                     <h3>Opciones y destinos</h3>
                     {node.kind !== 'menu' && (
@@ -622,62 +716,73 @@ function FlowEditor({
                         Este tipo de paso usa destinos fijos: no se agregan ni se quitan opciones.
                       </p>
                     )}
-                    {node.kind !== 'menu' && (
+                    {node.kind !== 'assign' && (
+                      <VariableSelect
+                        definitions={graph.variables ?? []}
+                        value={node.variable ?? ''}
+                        optional={node.kind === 'menu'}
+                        label={
+                          node.kind === 'condition'
+                            ? 'Variable a evaluar'
+                            : 'Guardar respuesta en variable'
+                        }
+                        onChange={(variable) =>
+                          updateNode({ ...node, variable: variable || undefined })
+                        }
+                        onCreate={() => {
+                          quickNode.current = node.id;
+                          setCreateRequest((n) => n + 1);
+                        }}
+                      />
+                    )}
+                    {node.kind === 'capture' && (
+                      <p className="flow-help">
+                        La respuesta se valida según el tipo elegido (hasta 120 caracteres). MENÚ e
+                        INICIO comienzan otro recorrido. Volver a una pregunta conserva las demás
+                        variables.
+                      </p>
+                    )}
+                    {node.kind === 'condition' && (
                       <>
                         <label>
-                          Variable
-                          <input
-                            maxLength={40}
-                            value={node.variable ?? ''}
-                            placeholder="Ej.: nombre"
+                          Comparación
+                          <select
+                            aria-label="Comparación"
+                            value={node.operator ?? ''}
                             onChange={(event) =>
-                              updateNode({ ...node, variable: event.target.value })
+                              updateNode({
+                                ...node,
+                                operator: event.target.value as FlowNode['operator'],
+                              })
                             }
-                          />
+                          >
+                            <option value="">Elegí una comparación</option>
+                            {allowedOperators(
+                              graph.variables?.find((d) => d.identifier === node.variable)?.type ??
+                                'text',
+                            ).map((op) => (
+                              <option key={op} value={op}>
+                                {operators[op]}
+                              </option>
+                            ))}
+                          </select>
                         </label>
-                        {node.kind === 'capture' ? (
-                          <p className="flow-help">
-                            Guarda un texto de hasta 120 caracteres para este recorrido. No pidas
-                            contraseñas, tarjetas ni datos sensibles. MENÚ e INICIO reinician y
-                            borran estas variables.
-                          </p>
-                        ) : (
-                          <>
-                            <label>
-                              Comparación
-                              <select
-                                value={node.operator ?? ''}
-                                onChange={(event) =>
-                                  updateNode({
-                                    ...node,
-                                    operator: event.target.value as FlowNode['operator'],
-                                  })
-                                }
-                              >
-                                <option value="">Elegí una comparación</option>
-                                <option value="equals">Es igual a</option>
-                                <option value="contains">Contiene</option>
-                                <option value="exists">Tiene valor</option>
-                              </select>
-                            </label>
-                            {node.operator !== 'exists' && (
-                              <label>
-                                Valor esperado
-                                <input
-                                  maxLength={120}
-                                  value={node.value ?? ''}
-                                  onChange={(event) =>
-                                    updateNode({ ...node, value: event.target.value })
-                                  }
-                                />
-                              </label>
-                            )}
-                            <p className="flow-help">
-                              El primer destino se usa si se cumple; el segundo, si no. No distingue
-                              mayúsculas ni tildes. Este paso no envía un mensaje.
-                            </p>
-                          </>
+                        {!['exists', 'empty', 'true', 'false'].includes(node.operator ?? '') && (
+                          <label>
+                            Valor esperado
+                            <input
+                              maxLength={120}
+                              value={node.value ?? ''}
+                              onChange={(event) =>
+                                updateNode({ ...node, value: event.target.value })
+                              }
+                            />
+                          </label>
                         )}
+                        <p className="flow-help">
+                          Primer destino: Sí. Segundo: No. Las comparaciones respetan el tipo de
+                          dato; el texto no distingue tildes ni mayúsculas.
+                        </p>
                       </>
                     )}
                     {node.kind === 'menu' && (
@@ -730,6 +835,45 @@ function FlowEditor({
                               ))}
                           </select>
                         </label>
+                        {node.kind === 'menu' && (
+                          <details className="variable-option-extra">
+                            <summary>Guardar valores de opción {index + 1}</summary>
+                            {node.variable && (
+                              <label>
+                                Valor para {'{{' + node.variable + '}}'}
+                                <input
+                                  maxLength={120}
+                                  value={option.value ?? option.label}
+                                  onChange={(e) =>
+                                    updateNode({
+                                      ...node,
+                                      options: node.options.map((o) =>
+                                        o.id === option.id ? { ...o, value: e.target.value } : o,
+                                      ),
+                                    })
+                                  }
+                                />
+                              </label>
+                            )}
+                            <p className="flow-help">
+                              La selección guarda el texto visible si no configurás otro valor.
+                              Podés agregar asignaciones a otras variables, en orden.
+                            </p>
+                            <AssignmentFields
+                              definitions={graph.variables ?? []}
+                              max={5}
+                              items={option.assignments ?? []}
+                              onChange={(assignments) =>
+                                updateNode({
+                                  ...node,
+                                  options: node.options.map((o) =>
+                                    o.id === option.id ? { ...o, assignments } : o,
+                                  ),
+                                })
+                              }
+                            />
+                          </details>
+                        )}
                         <Button
                           type="button"
                           variant="ghost"

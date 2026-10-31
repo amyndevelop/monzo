@@ -2,44 +2,40 @@
 import { useEffect, useRef, useState } from 'react';
 import { X, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import {
-  resolveConditions,
-  renderFlowText,
-  captureAnswer,
-  type FlowVariables,
-  type FlowGraph,
-} from '@/modules/automations/definition';
+import { advanceFlow, type EngineResult } from '@/modules/automations/engine';
+import type { FlowGraph } from '@/modules/automations/definition';
 export function FlowSimulator({ graph, onClose }: { graph: FlowGraph; onClose: () => void }) {
-  const dialog = useRef<HTMLDialogElement>(null);
-  const question = useRef<HTMLParagraphElement>(null);
-  const chat = useRef<HTMLDivElement>(null);
-  const [nodeId, setNodeId] = useState(graph.start);
-  const [variables, setVariables] = useState<FlowVariables>({});
-  const [answer, setAnswer] = useState('');
-  const [error, setError] = useState('');
-  const [history, setHistory] = useState<{ text: string; user?: boolean }[]>([]);
-  const node = resolveConditions(graph, nodeId, variables);
-  const text = renderFlowText(node.text, variables);
+  const dialog = useRef<HTMLDialogElement>(null),
+    question = useRef<HTMLParagraphElement>(null),
+    chat = useRef<HTMLDivElement>(null);
+  const [state, setState] = useState<EngineResult>(() => advanceFlow(graph, null, { text: '' }));
+  const [answer, setAnswer] = useState(''),
+    [history, setHistory] = useState<{ text: string; user?: boolean }[]>([]);
   useEffect(() => {
-    const element = dialog.current!;
-    const previous = document.activeElement;
-    element.showModal();
+    const el = dialog.current!,
+      previous = document.activeElement;
+    el.showModal();
     return () => {
-      element.close();
+      el.close();
       if (previous instanceof HTMLElement && previous.isConnected) previous.focus();
     };
   }, []);
   useEffect(() => {
     question.current?.focus();
     if (chat.current) chat.current.scrollTop = chat.current.scrollHeight;
-  }, [nodeId, history.length]);
+  }, [state]);
+  function reply(text: string, optionId?: string) {
+    setHistory((h) => [...h, { text: state.text }, { text, user: true }]);
+    setState(advanceFlow(graph, state, { text, optionId }));
+    setAnswer('');
+  }
   return (
     <dialog
       ref={dialog}
       className="flow-simulator"
       aria-labelledby="flow-simulator-title"
-      onCancel={(event) => {
-        event.preventDefault();
+      onCancel={(e) => {
+        e.preventDefault();
         onClose();
       }}
     >
@@ -65,23 +61,15 @@ export function FlowSimulator({ graph, onClose }: { graph: FlowGraph; onClose: (
           </p>
         ))}
         <p ref={question} tabIndex={-1}>
-          {text}
-          {node.kind === 'message' ? '\n\nEscribí MENÚ para volver al inicio.' : ''}
+          {state.text}
+          {state.node.kind === 'message' ? '\n\nEscribí MENÚ para volver al inicio.' : ''}
         </p>
-        {node.kind === 'capture' ? (
+        {state.reason && <p className="flow-simulator-outcome">Para el equipo: {state.reason}</p>}
+        {state.node.kind === 'capture' ? (
           <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              const value = captureAnswer(answer);
-              if (!value) {
-                setError('Ingresá un texto de 1 a 120 caracteres, sin saltos de línea.');
-                return;
-              }
-              setHistory([...history, { text }, { text: value, user: true }]);
-              setVariables({ ...variables, [node.variable!]: value });
-              setNodeId(node.options[0].next);
-              setAnswer('');
-              setError('');
+            onSubmit={(e) => {
+              e.preventDefault();
+              reply(answer);
             }}
           >
             <label>
@@ -90,23 +78,19 @@ export function FlowSimulator({ graph, onClose }: { graph: FlowGraph; onClose: (
                 autoComplete="off"
                 maxLength={120}
                 value={answer}
-                onChange={(event) => setAnswer(event.target.value)}
+                onChange={(e) => setAnswer(e.target.value)}
               />
             </label>
             <Button type="submit">Continuar</Button>
-            {error && <p role="alert">{error}</p>}
           </form>
-        ) : node.kind === 'menu' ? (
+        ) : state.node.kind === 'menu' ? (
           <div className="flow-simulator-options">
-            {node.options.map((option) => (
+            {state.node.options.map((option) => (
               <Button
                 key={option.id}
                 type="button"
                 variant="outline"
-                onClick={() => {
-                  setHistory([...history, { text }, { text: option.label, user: true }]);
-                  setNodeId(option.next);
-                }}
+                onClick={() => reply(option.label, option.id)}
               >
                 {option.label}
               </Button>
@@ -114,11 +98,27 @@ export function FlowSimulator({ graph, onClose }: { graph: FlowGraph; onClose: (
           </div>
         ) : (
           <p className="flow-simulator-outcome">
-            {node.kind === 'handoff'
+            {['handoff', 'blocked'].includes(state.status)
               ? 'La automatización se detiene y la conversación queda para el equipo.'
               : 'Fin de este recorrido. El cliente puede escribir MENÚ para empezar de nuevo.'}
           </p>
         )}
+        <details className="variable-preview">
+          <summary>Valores de esta ejecución</summary>
+          {Object.keys(state.variables).length ? (
+            <dl>
+              {Object.entries(state.variables).map(([key, value]) => (
+                <div key={key}>
+                  <dt>{key}</dt>
+                  <dd>{value || 'Vacío'}</dd>
+                </div>
+              ))}
+            </dl>
+          ) : (
+            <p>Sin valores guardados.</p>
+          )}
+          <p>Turno {state.turns} / 100. Las correcciones conservan los otros valores.</p>
+        </details>
       </div>
       <footer>
         <Button
@@ -126,10 +126,8 @@ export function FlowSimulator({ graph, onClose }: { graph: FlowGraph; onClose: (
           variant="outline"
           onClick={() => {
             setHistory([]);
-            setVariables({});
             setAnswer('');
-            setError('');
-            setNodeId(graph.start);
+            setState(advanceFlow(graph, null, { text: '' }));
           }}
         >
           <RotateCcw size={15} />

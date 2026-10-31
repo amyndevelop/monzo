@@ -34,9 +34,13 @@ El usuario eligió el nivel gratuito para pruebas. Primera entrega: laboratorio 
 
 El usuario eligió guardar respuestas, variables y condiciones sobre los árboles actuales. Integrada mediante el PR #6 en main (6b002958), con ambos despliegues de producción confirmados. No depende de Gemini ni de servicios nuevos. Ver docs/phase-8.md.
 
-## Fase 9 · Analíticas operativas — implementada
+## Fase 9 · Analíticas operativas — publicada
 
-El usuario eligió analíticas de conversaciones, mensajes y resultados de flujos. Informe por período y canal, gráfico diario, estados actuales y CSV de cantidades. Sin servicios ni migraciones nuevas. Ver docs/phase-9.md.
+El usuario eligió analíticas de conversaciones, mensajes y resultados de flujos. Informe por período y canal, gráfico diario, estados actuales y CSV de cantidades. Integrada mediante el PR #7 (8dcdbe48), con ambos despliegues de producción confirmados. Sin servicios ni migraciones nuevas. Ver docs/phase-9.md.
+
+## Fase 10 · Variables dinámicas — implementada; Neon pendiente
+
+Implementación solicitada por documento del usuario: catálogo tipado por empresa, captura y selección, múltiples asignaciones, inserción al cursor, condiciones tipadas, confirmación/corrección y ejecución compartida con el simulador. Versión 0.2.0. MVP de valores por ejecución; contacto/conversación son alcances futuros. Nueva migración novena validada localmente; falta aplicar el SQL en Neon antes de publicar el código. Ver docs/phase-10.md.
 
 ## Fases posteriores · Por definir y autorizar
 
