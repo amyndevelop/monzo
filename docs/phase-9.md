@@ -27,3 +27,9 @@ La API GET /api/workspaces/[tenantId]/analytics exige sesión verificada y membr
 Consultas parametrizadas y agregaciones en PostgreSQL, sin cargar el historial completo en Node. Una transacción RepeatableRead mantiene coherentes los agregados entre sí; fija UTC solo dentro de la transacción, tiene timeout global de 15 s y límite de 5 s por sentencia. Se reutilizan los índices existentes por empresa; para volúmenes mayores se evaluarán índices adicionales con planes y datos reales antes de agregar una migración. No se modifica el mensaje ni se usa una reserva de cuota para generar informes.
 
 No incluye costos de Meta/Gemini, tiempos históricos de primera respuesta, SLA, cierres históricos o tasas de resolución: el esquema actual no registra todos los eventos necesarios para afirmarlos.
+
+## Verificación de la entrega
+
+182/182 pruebas generales aprobadas, que incluyen 10 casos de Analíticas en escritorio/móvil. Repetición final de interfaz 2/2 después de ajustar el gráfico y la explicación junto a la descarga; repetición de calendario 2/2 con una muestra adicional exactamente en medianoche para comprobar el signo del desplazamiento +05:30. Compilación webpack final, tipos, lint y formato aprobados.
+
+Se revisaron capturas de escritorio y móvil del informe completo, gráfico diario y resultados de flujos con datos ficticios; se comprobaron teclado, CSV con las mismas cantidades, vacío, error recuperable, conservación de filtros y bloqueo explicado de exportación pendiente. Las pruebas de fechas cubren días de 23/25 horas, límites inclusivos de fechas y exclusión de los instantes fuera del día local. API verificada con sesión, roles, revocación, empresas/canales ajenos y parámetros inválidos. No se ejecutaron consultas sobre Neon ni se accedió a credenciales de producción.

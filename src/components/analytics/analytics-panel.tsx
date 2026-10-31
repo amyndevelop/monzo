@@ -285,11 +285,22 @@ export function AnalyticsPanel({ tenantId }: { tenantId: string }) {
           <section className="analytics-card">
             <div className="analytics-heading">
               <h2>Actividad por día</h2>
-              <Button type="button" variant="outline" disabled={dirty} onClick={exportDays}>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={dirty}
+                aria-describedby={dirty ? 'analytics-export-reason' : undefined}
+                onClick={exportDays}
+              >
                 <Download size={15} />
                 Descargar CSV diario
               </Button>
             </div>
+            {dirty && (
+              <p className="analytics-help" id="analytics-export-reason">
+                Aplicá los filtros pendientes para habilitar esta descarga.
+              </p>
+            )}
             <p className="analytics-help">
               Fecha de registro en MONZO, en la zona horaria de la empresa. Los envíos registrados
               incluyen los que aún no se entregaron.

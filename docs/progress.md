@@ -360,3 +360,9 @@ Validación: **172/172** generales, repetición final **32/32** automatizaciones
 ## Fase 8 publicada
 
 PR #6 integrado mediante 6b002958005c463c5e7fe93f4d27c9eea0c1a3a3. Vercel confirmó estado success para monzo y monzo-v sobre ese commit. No requirió migraciones ni secretos nuevos. Esta confirmación verifica el despliegue; no atribuye al entorno una prueba con el teléfono real del usuario.
+
+## Fase 9 · Analíticas operativas verificadas · 31 de octubre de 2026
+
+El usuario eligió esta fase tras publicar flujos avanzados. Informe por empresa, canal y fechas de hasta 90 días, mensajes/conversaciones, gráfico diario, estados de envío y resultados de pasos automáticos. CSV de cantidades sin contenido de mensajes. Zona horaria efectiva de la empresa, incluidos cambios de horario y desplazamientos fijos. Se distinguen aceptación, entrega y lectura; no se afirman recorridos resueltos, tiempos históricos o costos sin los eventos necesarios. Sin migraciones, servicios o secretos nuevos. No utiliza Meta ni Gemini para generar informes.
+
+Validación: **182/182** generales, incluidos **10** casos de Analíticas; repetición final **2/2** de interfaz y **2/2** de calendario con límites locales. Compilación webpack, tipos, lint y formato aprobados. Capturas de escritorio/móvil revisadas del informe, gráfico y resultados de flujos. Errores recuperables, filtros conservados, exportación bloqueada con explicación y sin resultados viejos durante carga/error. Acceso verificado por sesión/membresía y aislamiento de empresa/canal, con respuestas no-store. Definiciones y límites en docs/phase-9.md. Los previews del PR #7 compilaron correctamente; se prepara su integración.

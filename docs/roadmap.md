@@ -34,7 +34,7 @@ El usuario eligió el nivel gratuito para pruebas. Primera entrega: laboratorio 
 
 El usuario eligió guardar respuestas, variables y condiciones sobre los árboles actuales. Integrada mediante el PR #6 en main (6b002958), con ambos despliegues de producción confirmados. No depende de Gemini ni de servicios nuevos. Ver docs/phase-8.md.
 
-## Fase 9 · Analíticas operativas — en desarrollo
+## Fase 9 · Analíticas operativas — implementada
 
 El usuario eligió analíticas de conversaciones, mensajes y resultados de flujos. Informe por período y canal, gráfico diario, estados actuales y CSV de cantidades. Sin servicios ni migraciones nuevas. Ver docs/phase-9.md.
 

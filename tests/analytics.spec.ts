@@ -304,12 +304,25 @@ test('calendario: día de 25 horas y zona de desplazamiento fijo', async () => {
     where: { tenantId: f.tenant.id },
     data: { timezone: '+05:30' },
   });
+  // Local midnight at +05:30: confirms the sign of the fixed offset, not only the count at DST boundaries.
+  await db.message.create({
+    data: {
+      tenantId: f.tenant.id,
+      accountId: f.account.id,
+      conversationId: c.id,
+      direction: 'INBOUND',
+      status: 'RECEIVED',
+      type: 'text',
+      createdAt: new Date('2026-10-31T18:30:00Z'),
+      occurredAt: new Date('2026-10-31T18:30:00Z'),
+    },
+  });
   const fixed = await loadAnalytics(
     db,
     f.tenant.id,
     { from: '2026-11-01', to: '2026-11-01' },
     new Date('2026-11-03T00:00:00Z'),
   );
-  expect(fixed.messages.inbound).toBe(2);
-  expect(fixed.days[0].inbound).toBe(2);
+  expect(fixed.messages.inbound).toBe(3);
+  expect(fixed.days[0].inbound).toBe(3);
 });
