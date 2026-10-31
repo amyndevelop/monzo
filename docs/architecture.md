@@ -83,3 +83,7 @@ sí mismo. No se usan Gemini ni herramientas externas. Ver docs/phase-7.md.
 ### Variables del recorrido guiado
 
 La fase 8 reutiliza automationState JSON para respuestas de hasta 120 caracteres, aisladas por conversación. Los nodos capture guardan una variable y avanzan por un destino; condition resuelve Sí/No sin generar mensajes intermedios. definition.ts comparte comparaciones y sustitución entre simulador y runtime. La validación intersecta las variables disponibles de todos los predecesores del DAG antes de permitir lecturas. Cambios de publicación, reinicio y reanudación invalidan el estado anterior. No agrega evaluación de código, llamadas externas ni uso de Gemini.
+
+### Analíticas operativas · Fase 9
+
+API privada de agregados por empresa/canal y período de hasta 90 días. El núcleo analytics/core.ts comparte consultas PostgreSQL parametrizadas con las pruebas; el servicio valida sesión/membresía antes de ejecutarlas. Una transacción RepeatableRead obtiene un informe coherente con fecha de registro en MONZO y zona horaria efectiva. No carga textos, credenciales ni variables capturadas. El panel cliente cancela consultas anteriores, oculta resultados durante carga/error y exporta únicamente cantidades diarias. No agrega servicios ni esquema. Definiciones y límites en docs/phase-9.md.
