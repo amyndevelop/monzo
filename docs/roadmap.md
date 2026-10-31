@@ -38,9 +38,9 @@ El usuario eligió guardar respuestas, variables y condiciones sobre los árbole
 
 El usuario eligió analíticas de conversaciones, mensajes y resultados de flujos. Informe por período y canal, gráfico diario, estados actuales y CSV de cantidades. Integrada mediante el PR #7 (8dcdbe48), con ambos despliegues de producción confirmados. Sin servicios ni migraciones nuevas. Ver docs/phase-9.md.
 
-## Fase 10 · Variables dinámicas — implementada; Neon pendiente
+## Fase 10 · Variables dinámicas — implementada; Neon confirmado
 
-Implementación solicitada por documento del usuario: catálogo tipado por empresa, captura y selección, múltiples asignaciones, inserción al cursor, condiciones tipadas, confirmación/corrección y ejecución compartida con el simulador. Versión 0.2.0. MVP de valores por ejecución; contacto/conversación son alcances futuros. Nueva migración novena validada localmente; falta aplicar el SQL en Neon antes de publicar el código. Ver docs/phase-10.md.
+Implementación solicitada por documento del usuario: catálogo tipado por empresa, captura y selección, múltiples asignaciones, inserción al cursor, condiciones tipadas, confirmación/corrección y ejecución compartida con el simulador. Versión 0.2.0. MVP de valores por ejecución; contacto/conversación son alcances futuros. Novena migración validada localmente y confirmada por el usuario en Neon con neondb | 1 | 12 | 9. Se prepara la integración del PR #8. Ver docs/phase-10.md.
 
 ## Fases posteriores · Por definir y autorizar
 
