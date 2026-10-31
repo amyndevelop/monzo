@@ -1,15 +1,10 @@
 import { Prisma, type PrismaClient } from '@prisma/client';
 import { z } from 'zod';
-import { flowSchema, flowIssues } from './definition';
+import { flowSchema, flowIssues, effectiveVariables, type FlowGraph } from './definition';
+import { variableDefinition } from './variable-registry';
 import { pauseForHuman } from './runtime';
-export class FlowError extends Error {
-  constructor(
-    public status: number,
-    message: string,
-  ) {
-    super(message);
-  }
-}
+import { FlowError } from './errors';
+export { FlowError } from './errors';
 const revision = z.number().int().min(0);
 export const mutationSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('save'), revision, graph: flowSchema }).strict(),
@@ -37,8 +32,23 @@ export async function mutateFlow(
         409,
         'El flujo cambió en otra sesión. Recargá su versión antes de guardar; tu borrador sigue en pantalla.',
       );
+    async function compile(graph: FlowGraph) {
+      if (!graph.variables)
+        for (const def of effectiveVariables(graph))
+          await tx.automationVariable.upsert({
+            where: { tenantId_identifier: { tenantId, identifier: def.identifier } },
+            create: { tenantId, ...def },
+            update: {},
+          });
+      const variables = (
+        await tx.automationVariable.findMany({ where: { tenantId }, orderBy: { createdAt: 'asc' } })
+      ).map(variableDefinition);
+      if (variables.length > 100)
+        throw new FlowError(409, 'El máximo es de 100 variables por empresa.');
+      return { ...graph, variables };
+    }
     if (data.action === 'save') {
-      const draft = data.graph as unknown as Prisma.InputJsonValue;
+      const draft = (await compile(data.graph)) as unknown as Prisma.InputJsonValue;
       return flow
         ? tx.automationFlow.update({
             where: { id: flow.id },
@@ -47,12 +57,15 @@ export async function mutateFlow(
         : tx.automationFlow.create({ data: { tenantId, accountId, draft } });
     }
     if (!flow) throw new FlowError(409, 'Guardá primero un borrador del flujo.');
+    let published: FlowGraph | undefined;
     if (data.action !== 'pause') {
       if (!account.enabled || !account.tokenEncrypted || account.lastErrorCode === 'META_190')
         throw new FlowError(409, 'Autorizá el número en Canales antes de activar el flujo.');
       if (data.action === 'enable' && !flow.published)
         throw new FlowError(409, 'Publicá un borrador antes de activar el flujo.');
-      const graph = flowSchema.parse(data.action === 'publish' ? flow.draft : flow.published);
+      const source = flowSchema.parse(data.action === 'publish' ? flow.draft : flow.published);
+      const graph = data.action === 'publish' ? await compile(source) : source;
+      if (data.action === 'publish') published = graph;
       const issues = flowIssues(graph);
       if (issues.length) throw new FlowError(409, issues.join(' '));
     }
@@ -67,7 +80,7 @@ export async function mutateFlow(
         enabled: data.action !== 'pause',
         publishedVersion: { increment: 1 },
         ...(data.action === 'publish'
-          ? { published: flow.draft as Prisma.InputJsonValue, publishedByUserId: userId }
+          ? { published: published as unknown as Prisma.InputJsonValue, publishedByUserId: userId }
           : {}),
         ...(data.action === 'enable' ? { publishedByUserId: userId } : {}),
         ...(data.action !== 'pause' ? { activatedAt: new Date() } : {}),

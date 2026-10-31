@@ -87,3 +87,9 @@ La fase 8 reutiliza automationState JSON para respuestas de hasta 120 caracteres
 ### Analíticas operativas · Fase 9
 
 API privada de agregados por empresa/canal y período de hasta 90 días. El núcleo analytics/core.ts comparte consultas PostgreSQL parametrizadas con las pruebas; el servicio valida sesión/membresía antes de ejecutarlas. Una transacción RepeatableRead obtiene un informe coherente con fecha de registro en MONZO y zona horaria efectiva. No carga textos, credenciales ni variables capturadas. El panel cliente cancela consultas anteriores, oculta resultados durante carga/error y exporta únicamente cantidades diarias. No agrega servicios ni esquema. Definiciones y límites en docs/phase-9.md.
+
+### Variables dinámicas · MONZO 0.2.0
+
+AutomationVariable es el catálogo por Tenant, con unicidad de identificador, tipos, predeterminados, alcance execution, revisiones y fechas. Las publicaciones guardan instantáneas de definiciones; el runtime no consulta el catálogo para cada mensaje. El motor puro automations/engine.ts comparte validación de entradas, asignaciones, condiciones e interpolación entre simulador e ingreso real. Los valores canónicos, runId y contador persisten en automationState dentro de la misma transacción de ingreso, bajo el bloqueo de Tenant ya existente. Se mantienen source/event/generation y la cola saliente, sin HTTP en la transacción.
+
+La validación usa asignación definida por punto fijo para permitir correcciones con preguntas; rechaza ciclos exclusivamente automáticos y variables leídas antes de estar disponibles. Cambiar el catálogo no modifica una publicación vigente. Owner/Admin gestionan definiciones con control de revisión; referencias guardadas/publicadas bloquean cambios incompatibles y eliminaciones. Contacto y conversación quedan para otros alcances futuros. Ver docs/phase-10.md para límites, migración nueve y guía.

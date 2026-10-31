@@ -82,3 +82,9 @@ Los envíos guardan una instantánea validada y un hash canónico para idempoten
 ## Analíticas · Fase 9
 
 La API de informes revalida sesión verificada y membresía; cada agregado limita empresa y canal. Rechaza filtros desconocidos/duplicados, fechas inválidas y períodos mayores a 90 días. Solo devuelve agregados y nombres/números de los canales propios; no consulta textos, contactos, credenciales o variables capturadas. Usa SQL parametrizado, snapshot RepeatableRead, límites de ejecución y respuestas no-store. El CSV se genera en el navegador a partir del informe autorizado, con fechas/cantidades, sin fórmulas, textos, teléfonos ni endpoints públicos de descarga. No transmite datos a Meta, Gemini ni servicios analíticos de terceros.
+
+## Variables dinámicas · 0.2.0
+
+Definiciones por empresa con sesión verificada y membresía; escritura Owner/Admin y origen exacto. Revisiones, unicidad y referencias se verifican bajo bloqueo de Tenant. No se aceptan definiciones inventadas del cliente para publicar: se compilan desde el catálogo autorizado. Las versiones son instantáneas inmutables. Valores por Conversation/ejecución, actualizados con el mensaje entrante idempotente y protegidos por claves compuestas, versión, generación y controles humanos. Un botón antiguo no sobrescribe la selección actual.
+
+Tipos y operadores son listas cerradas, con parsing explícito y comparación decimal exacta. La interpolación no evalúa expresiones, no interpreta HTML, no repite sustituciones ni visita URLs. Predeterminados y variables vacías tienen semántica explícita. Ciclos automáticos, límites de recorrido/transporte y expansiones mayores a 900 caracteres se controlan. No se imprimen valores capturados en logs. No se agregan canales ni se envían datos a Gemini. Alcances de contacto/conversación permanecen deshabilitados y rechazados por el servidor.

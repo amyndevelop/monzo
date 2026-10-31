@@ -5204,3 +5204,206 @@ svg {
     font-size: 24px;
   }
 }
+
+.variable-manager {
+  margin: 20px 0;
+}
+.variable-manager summary,
+.variable-preview summary,
+.variable-option-extra summary {
+  cursor: pointer;
+  color: #007b85;
+  font-size: 13px;
+}
+.variable-manager button {
+  margin: 8px 8px 8px 0;
+}
+.variable-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: start;
+  justify-content: space-between;
+  border-top: 1px solid #dbe8eb;
+  padding: 18px 0;
+  min-width: 0;
+}
+.variable-row > p,
+.variable-row > details {
+  flex-basis: 100%;
+}
+.variable-row code {
+  overflow-wrap: anywhere;
+  color: #007b85;
+  font-size: 12px;
+}
+.variable-row h3 {
+  font-size: 14px;
+  font-weight: 600;
+}
+.variable-row p {
+  font-size: 12px;
+  color: #607d87;
+  overflow-wrap: anywhere;
+}
+.variable-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.variable-dialog {
+  margin: auto;
+  padding: 22px;
+  border: 1px solid #c8dfe2;
+  border-radius: 18px;
+  width: min(520px, calc(100vw - 24px));
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+  background: white;
+  color: #17323d;
+}
+.variable-dialog::backdrop {
+  background: #102c3560;
+  backdrop-filter: blur(4px);
+}
+.variable-dialog h2 {
+  font-size: 20px;
+  margin-bottom: 16px;
+}
+.variable-dialog fieldset,
+.variable-dialog label,
+.variable-assignments fieldset {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.variable-dialog input:not([type='checkbox']),
+.variable-dialog select,
+.variable-dialog textarea {
+  min-width: 0;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #c8dfe2;
+  border-radius: 9px;
+  background: white;
+  font-size: 14px;
+}
+.variable-dialog label {
+  font-size: 13px;
+}
+.variable-dialog footer {
+  display: flex;
+  justify-content: end;
+  gap: 10px;
+  margin-top: 16px;
+}
+.variable-dialog input:focus-visible,
+.variable-dialog select:focus-visible,
+.variable-dialog textarea:focus-visible,
+.variable-picker button:focus-visible {
+  outline: 2px solid #008d98;
+  outline-offset: 2px;
+}
+.variable-dialog .variable-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.variable-assignments {
+  display: grid;
+  gap: 12px;
+}
+.variable-assignments fieldset {
+  padding: 12px;
+  border: 1px solid #dbe8eb;
+  border-radius: 10px;
+}
+.variable-assignments legend {
+  font-size: 12px;
+  padding: 0 4px;
+}
+.variable-option-extra {
+  grid-column: 1/-1;
+  min-width: 0;
+  width: 100%;
+}
+.variable-select {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.variable-picker {
+  display: grid;
+  gap: 6px;
+  max-height: 260px;
+  overflow: auto;
+  border: 1px solid #dbe8eb;
+  border-radius: 10px;
+  padding: 8px;
+}
+.variable-picker button {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  text-align: left;
+  background: #f3faf9;
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+}
+.variable-picker strong {
+  font-size: 13px;
+}
+.variable-picker code,
+.variable-picker small {
+  font-size: 11px;
+}
+.variable-preview {
+  margin: 12px 0;
+  min-width: 0;
+}
+.variable-preview pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+  font-size: 13px;
+  background: #edf9f7;
+  padding: 12px;
+  border-radius: 10px;
+}
+.variable-preview dl div {
+  padding: 6px 0;
+}
+.variable-preview dd {
+  overflow-wrap: anywhere;
+}
+.variable-tokens {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.variable-tokens span {
+  font-size: 11px;
+  border-radius: 5px;
+  padding: 3px 6px;
+  background: #e0f4f1;
+  color: #007b85;
+}
+.variable-tokens .missing {
+  background: #fff0ed;
+  color: #a84731;
+}
+.variable-row > div {
+  min-width: 0;
+  max-width: 100%;
+}
+.variable-row h3 {
+  overflow-wrap: anywhere;
+}
+.variable-example-button {
+  white-space: normal;
+  height: auto;
+  min-height: 44px;
+  max-width: 100%;
+  text-align: left;
+}

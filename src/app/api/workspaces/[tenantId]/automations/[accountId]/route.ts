@@ -11,6 +11,6 @@ export async function POST(request: Request, { params }: Context) {
   return apiResponse(async () => {
     assertMutationOrigin(request);
     const { tenantId, accountId } = await params;
-    return changeFlow(tenantId, accountId, await readJson(request, 180000));
+    return changeFlow(tenantId, accountId, await readJson(request, 512000));
   });
 }

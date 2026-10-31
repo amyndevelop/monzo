@@ -1,8 +1,5 @@
 import type { Prisma, WhatsappAccount, Conversation } from '@prisma/client';
 import {
-  captureAnswer,
-  renderFlowText,
-  resolveConditions,
   flowSchema,
   flowIssues,
   normalize,
@@ -10,6 +7,7 @@ import {
   choiceId,
   type FlowSnapshot,
 } from './definition';
+import { advanceFlow } from './engine';
 import { withinWindow } from '../whatsapp/core/payload';
 
 // Call under the Tenant row lock. Never performs HTTP or schedules work in a transaction.
@@ -74,55 +72,27 @@ export async function advanceAutomation(
   if (conversation.lastInboundAt && !withinWindow(conversation.lastInboundAt)) state = null;
   const restart = ['menu', 'inicio'].includes(normalize(incoming.text));
   if (state?.status === 'completed' && !restart) return;
-  const variables = state && !restart ? { ...state.variables } : {};
-  let node = graph.nodes.find((n) => n.id === (state && !restart ? state.nodeId : graph.start))!;
-  let misses = 0;
-  let hint = '';
-  if (state?.status === 'waiting' && !restart && node?.kind === 'capture') {
-    const answer = captureAnswer(incoming.text, incoming.choice);
-    if (answer) {
-      variables[node.variable!] = answer;
-      node = graph.nodes.find((n) => n.id === node.options[0].next)!;
-    } else {
-      misses = state.misses + 1;
-      hint = 'Respondé con un texto de hasta 120 caracteres, sin saltos de línea.\n\n';
-      if (misses >= 3)
-        node = {
-          id: 'ayuda',
-          label: 'Atención humana',
-          kind: 'handoff',
-          text: 'Un integrante del equipo continuará la atención.',
-          options: [],
-        };
-    }
-  } else if (state?.status === 'waiting' && !restart && node?.kind === 'menu') {
-    const option = node.options.find((o, index) =>
-      incoming.choice
-        ? incoming.choice ===
-          choiceId(flow.id, flow.publishedVersion, conversation.automationGeneration, node.id, o.id)
-        : normalize(incoming.text) === String(index + 1) ||
-          normalize(incoming.text) === normalize(o.label),
-    );
-    if (option) node = graph.nodes.find((n) => n.id === option.next)!;
-    else {
-      misses = state.misses + 1;
-      hint = 'Elegí una opción del menú para continuar.\n\n';
-      if (misses >= 3)
-        node = {
-          id: 'ayuda',
-          label: 'Atención humana',
-          kind: 'handoff',
-          text: 'No pudimos reconocer tu elección. Un integrante del equipo continuará la atención.',
-          options: [],
-        };
-    }
-  }
-  if (!node) {
-    await pauseForHuman(tx, account.tenantId, conversation.id);
-    return;
-  }
-  if (node.kind === 'condition') node = resolveConditions(graph, node.id, variables);
-  const rendered = renderFlowText(node.text, variables);
+  const currentNode = graph.nodes.find((n) => n.id === state?.nodeId);
+  const option =
+    incoming.choice && currentNode?.kind === 'menu'
+      ? currentNode.options.find(
+          (o) =>
+            incoming.choice ===
+            choiceId(
+              flow.id,
+              flow.publishedVersion,
+              conversation.automationGeneration,
+              currentNode.id,
+              o.id,
+            ),
+        )
+      : undefined;
+  const result = advanceFlow(graph, state, {
+    text: incoming.text,
+    optionId: option?.id,
+    invalidChoice: Boolean(incoming.choice && !option),
+  });
+  const { node, variables, misses } = result;
   const [tenantCount, conversationCount] = await Promise.all([
     tx.message.count({
       where: {
@@ -140,7 +110,7 @@ export async function advanceAutomation(
       },
     }),
   ]);
-  if (tenantCount >= 30 || conversationCount >= 6) {
+  if (tenantCount >= 30 || conversationCount >= (graph.schemaVersion === 2 ? 20 : 6)) {
     await pauseForHuman(tx, account.tenantId, conversation.id);
     await tx.conversation.update({
       where: { id: conversation.id },
@@ -161,9 +131,7 @@ export async function advanceAutomation(
   }
   const generation = conversation.automationGeneration + 1;
   const text =
-    node.kind === 'message'
-      ? `${rendered}\n\nEscribí MENÚ para volver al inicio.`
-      : (['menu', 'capture'].includes(node.kind) ? hint : '') + rendered;
+    node.kind === 'message' ? `${result.text}\n\nEscribí MENÚ para volver al inicio.` : result.text;
   const snapshot: FlowSnapshot = {
     version: 1,
     flowId: flow.id,
@@ -218,11 +186,10 @@ export async function advanceAutomation(
         flowId: flow.id,
         version: flow.publishedVersion,
         nodeId: node.id,
-        status: ['menu', 'capture'].includes(node.kind)
-          ? 'waiting'
-          : node.kind === 'handoff'
-            ? 'handoff'
-            : 'completed',
+        status: result.status,
+        turns: result.turns,
+        runId: result.runId,
+        ...(result.reason ? { reason: result.reason } : {}),
         misses,
         variables,
       },

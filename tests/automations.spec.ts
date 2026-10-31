@@ -353,7 +353,7 @@ test('API: origen, tamaños, números ajenos y lectura por miembros', async () =
   expect(
     (
       await f.api.post(path, {
-        data: { action: 'save', revision: 0, graph: { ...graph(), name: 'a'.repeat(180001) } },
+        data: { action: 'save', revision: 0, graph: { ...graph(), name: 'a'.repeat(512001) } },
       })
     ).status(),
   ).toBe(413);

@@ -30,23 +30,24 @@ model User {
 }
 
 model Tenant {
-  id                String                 @id @default(cuid())
-  name              String
-  slug              String                 @unique
-  createdAt         DateTime               @default(now())
-  updatedAt         DateTime               @updatedAt
-  memberships       Membership[]
-  settings          TenantSettings?
-  invitations       TenantInvitation[]
-  whatsappAccounts  WhatsappAccount[]
-  contacts          Contact[]
-  conversations     Conversation[]
-  messages          Message[]
-  webhookEvents     WhatsappWebhookEvent[]
-  conversationNotes ConversationNote[]
-  automationFlows   AutomationFlow[]
-  aiAgent           AiAgent?
-  whatsappTemplates WhatsappTemplate[]
+  id                  String                 @id @default(cuid())
+  name                String
+  slug                String                 @unique
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+  memberships         Membership[]
+  settings            TenantSettings?
+  invitations         TenantInvitation[]
+  whatsappAccounts    WhatsappAccount[]
+  contacts            Contact[]
+  conversations       Conversation[]
+  messages            Message[]
+  webhookEvents       WhatsappWebhookEvent[]
+  conversationNotes   ConversationNote[]
+  automationVariables AutomationVariable[]
+  automationFlows     AutomationFlow[]
+  aiAgent             AiAgent?
+  whatsappTemplates   WhatsappTemplate[]
 }
 
 model Membership {
@@ -378,4 +379,22 @@ model AutomationFlow {
   @@unique([accountId, tenantId])
   @@unique([id, accountId, tenantId])
   @@index([tenantId])
+}
+
+model AutomationVariable {
+  id           String   @id @default(cuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  name         String
+  identifier   String
+  type         String
+  description  String   @default("")
+  defaultValue String?
+  scope        String   @default("execution")
+  currency     String   @default("ARS")
+  revision     Int      @default(1)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([tenantId, identifier])
 }
