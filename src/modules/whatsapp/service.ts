@@ -337,6 +337,7 @@ export async function getThread(tenantId: string, conversationId: string, before
       ? {
           enabled: flow.enabled && Boolean(publisher && publisher.role !== 'MEMBER'),
           paused: conversation.automationPaused,
+          variables: autoState.success ? (autoState.data.variables ?? {}) : {},
           state: autoState.success ? autoState.data.status : null,
           reason:
             !publisher || publisher.role === 'MEMBER'

@@ -346,3 +346,7 @@ código de la entrega finalizaron correctamente. Se prepara la publicación; fal
 confirmar los despliegues de producción y un recorrido real de botones/listas.
 No se activa ningún flujo del usuario automáticamente. Un hilo existente debe
 reanudarse expresamente después de publicar su flujo para probarlo con el teléfono.
+
+## Fase 7 publicada y fase 8 elegida
+
+PR #5 integrado en main mediante ab817f4. Vercel confirmó ambos despliegues de producción. El usuario indicó continuar y eligió guardar respuestas, variables y condiciones como siguiente fase. No se atribuye a esta comprobación un envío externo observado por el entorno.

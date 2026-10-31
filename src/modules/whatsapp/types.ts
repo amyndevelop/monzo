@@ -52,6 +52,7 @@ export type ChatThread = {
   automation?: {
     enabled: boolean;
     paused: boolean;
+    variables?: Record<string, string>;
     state: string | null;
     reason: string | null;
   } | null;

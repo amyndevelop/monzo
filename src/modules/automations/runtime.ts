@@ -1,5 +1,8 @@
 import type { Prisma, WhatsappAccount, Conversation } from '@prisma/client';
 import {
+  captureAnswer,
+  renderFlowText,
+  resolveConditions,
   flowSchema,
   flowIssues,
   normalize,
@@ -71,10 +74,28 @@ export async function advanceAutomation(
   if (conversation.lastInboundAt && !withinWindow(conversation.lastInboundAt)) state = null;
   const restart = ['menu', 'inicio'].includes(normalize(incoming.text));
   if (state?.status === 'completed' && !restart) return;
+  const variables = state && !restart ? { ...state.variables } : {};
   let node = graph.nodes.find((n) => n.id === (state && !restart ? state.nodeId : graph.start))!;
   let misses = 0;
   let hint = '';
-  if (state?.status === 'waiting' && !restart && node?.kind === 'menu') {
+  if (state?.status === 'waiting' && !restart && node?.kind === 'capture') {
+    const answer = captureAnswer(incoming.text, incoming.choice);
+    if (answer) {
+      variables[node.variable!] = answer;
+      node = graph.nodes.find((n) => n.id === node.options[0].next)!;
+    } else {
+      misses = state.misses + 1;
+      hint = 'Respondé con un texto de hasta 120 caracteres, sin saltos de línea.\n\n';
+      if (misses >= 3)
+        node = {
+          id: 'ayuda',
+          label: 'Atención humana',
+          kind: 'handoff',
+          text: 'Un integrante del equipo continuará la atención.',
+          options: [],
+        };
+    }
+  } else if (state?.status === 'waiting' && !restart && node?.kind === 'menu') {
     const option = node.options.find((o, index) =>
       incoming.choice
         ? incoming.choice ===
@@ -100,6 +121,8 @@ export async function advanceAutomation(
     await pauseForHuman(tx, account.tenantId, conversation.id);
     return;
   }
+  if (node.kind === 'condition') node = resolveConditions(graph, node.id, variables);
+  const rendered = renderFlowText(node.text, variables);
   const [tenantCount, conversationCount] = await Promise.all([
     tx.message.count({
       where: {
@@ -127,6 +150,7 @@ export async function advanceAutomation(
           version: flow.publishedVersion,
           nodeId: node.id,
           status: 'blocked',
+          variables,
           misses,
           reason:
             'Se alcanzó el límite de respuestas automáticas. Revisá la conversación antes de reanudar.',
@@ -138,8 +162,8 @@ export async function advanceAutomation(
   const generation = conversation.automationGeneration + 1;
   const text =
     node.kind === 'message'
-      ? `${node.text}\n\nEscribí MENÚ para volver al inicio.`
-      : (node.kind === 'menu' ? hint : '') + node.text;
+      ? `${rendered}\n\nEscribí MENÚ para volver al inicio.`
+      : (['menu', 'capture'].includes(node.kind) ? hint : '') + rendered;
   const snapshot: FlowSnapshot = {
     version: 1,
     flowId: flow.id,
@@ -194,9 +218,13 @@ export async function advanceAutomation(
         flowId: flow.id,
         version: flow.publishedVersion,
         nodeId: node.id,
-        status:
-          node.kind === 'menu' ? 'waiting' : node.kind === 'handoff' ? 'handoff' : 'completed',
+        status: ['menu', 'capture'].includes(node.kind)
+          ? 'waiting'
+          : node.kind === 'handoff'
+            ? 'handoff'
+            : 'completed',
         misses,
+        variables,
       },
     },
   });

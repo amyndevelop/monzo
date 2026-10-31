@@ -10,8 +10,11 @@ export const flowSchema = z
           .object({
             id: key,
             label: z.string().trim().max(60),
-            kind: z.enum(['menu', 'message', 'handoff']),
+            kind: z.enum(['menu', 'message', 'handoff', 'capture', 'condition']),
             text: z.string().trim().max(900),
+            variable: z.string().max(40).optional(),
+            operator: z.enum(['equals', 'contains', 'exists']).optional(),
+            value: z.string().trim().max(120).optional(),
             options: z
               .array(
                 z
@@ -35,7 +38,8 @@ export function flowIssues(graph: FlowGraph) {
   if (nodes.size !== graph.nodes.length) issues.push('Hay identificadores de pasos repetidos.');
   for (const node of graph.nodes) {
     const name = node.label || node.id;
-    if (!node.label || !node.text) issues.push(`${name}: completá título y mensaje.`);
+    if (!node.label || (node.kind !== 'condition' && !node.text))
+      issues.push(`${name}: completá título y mensaje.`);
     if (node.kind === 'menu') {
       if (!node.options.length) issues.push(`${name}: agregá al menos una opción.`);
       if (
@@ -46,6 +50,17 @@ export function flowIssues(graph: FlowGraph) {
       for (const option of node.options)
         if (!option.label || !nodes.has(option.next))
           issues.push(`${name}: completá el texto y destino de cada opción.`);
+    } else if (node.kind === 'capture' || node.kind === 'condition') {
+      if (!/^[a-z][a-z0-9_]{0,39}$/.test(node.variable ?? ''))
+        issues.push(`${name}: usá una variable como nombre o tipo_consulta.`);
+      const expected = node.kind === 'capture' ? 1 : 2;
+      if (node.options.length !== expected || node.options.some((o) => !nodes.has(o.next)))
+        issues.push(`${name}: completá ${expected} destinos.`);
+      if (
+        node.kind === 'condition' &&
+        (!node.operator || (node.operator !== 'exists' && !node.value))
+      )
+        issues.push(`${name}: completá la condición.`);
     } else if (node.options.length) issues.push(`${name}: un paso final no puede tener opciones.`);
   }
   const visited = new Set<string>();
@@ -66,7 +81,33 @@ export function flowIssues(graph: FlowGraph) {
   if (cycle) issues.push('El árbol tiene un ciclo. Conectá las opciones hacia pasos siguientes.');
   if (visited.size !== nodes.size)
     issues.push('Hay pasos sin conectar desde el inicio. Conectalos o eliminalos.');
-  return issues;
+  // Intersect predecessor outputs; evaluate shared branches once per node.
+  const outputs = new Map<string, Set<string>>();
+  function check(id: string): Set<string> {
+    if (outputs.has(id)) return outputs.get(id)!;
+    const node = nodes.get(id)!;
+    const parents = graph.nodes.filter(
+      (n) => visited.has(n.id) && n.options.some((o) => o.next === id),
+    );
+    const sources = id === graph.start ? [] : parents.map((n) => check(n.id));
+    const available = sources.length
+      ? new Set([...sources[0]].filter((v) => sources.every((s) => s.has(v))))
+      : new Set<string>();
+    const reads =
+      node.kind === 'condition'
+        ? [node.variable ?? '']
+        : [...node.text.matchAll(/\{\{([^{}]+)\}\}/g)].map((m) => m[1]);
+    for (const variable of reads)
+      if (!available.has(variable))
+        issues.push(
+          `${node.label}: la variable ${variable} debe guardarse antes en todos los caminos.`,
+        );
+    if (node.kind === 'capture' && node.variable) available.add(node.variable);
+    outputs.set(id, available);
+    return available;
+  }
+  if (!cycle && nodes.size === graph.nodes.length) for (const id of visited) check(id);
+  return [...new Set(issues)];
 }
 export const normalize = (text: string) =>
   text
@@ -111,6 +152,7 @@ export const stateSchema = z.object({
   status: z.enum(['waiting', 'completed', 'handoff', 'blocked']),
   misses: z.number().int().min(0),
   reason: z.string().optional(),
+  variables: z.record(z.string(), z.string().max(120)).optional(),
 });
 export const snapshotSchema = z.object({
   version: z.literal(1),
@@ -118,7 +160,7 @@ export const snapshotSchema = z.object({
   publishedVersion: z.number().int(),
   generation: z.number().int(),
   nodeId: key,
-  kind: z.enum(['menu', 'message', 'handoff']),
+  kind: z.enum(['menu', 'message', 'handoff', 'capture', 'condition']),
   text: z.string().max(1024),
   choices: z
     .array(z.object({ id: z.string().min(1).max(200), label: z.string().min(1).max(20) }))
@@ -160,4 +202,38 @@ export function interactivePayload(snapshot: FlowSnapshot) {
           ],
         },
       };
+}
+
+export type FlowVariables = Record<string, string>;
+export function renderFlowText(text: string, variables: FlowVariables) {
+  return text.replace(/\{\{([^{}]+)\}\}/g, (_, key: string) => variables[key] ?? '').slice(0, 900);
+}
+export function resolveConditions(
+  graph: FlowGraph,
+  id: string,
+  variables: FlowVariables,
+): FlowNode {
+  let node = graph.nodes.find((n) => n.id === id);
+  const visited = new Set<string>();
+  while (node?.kind === 'condition') {
+    if (visited.has(node.id)) throw new Error('INVALID_FLOW_CONDITION');
+    visited.add(node.id);
+    const actual = normalize(variables[node.variable ?? ''] ?? '');
+    const expected = normalize(node.value ?? '');
+    const matches =
+      node.operator === 'exists'
+        ? Boolean(actual)
+        : node.operator === 'contains'
+          ? actual.includes(expected)
+          : actual === expected;
+    node = graph.nodes.find((n) => n.id === node!.options[matches ? 0 : 1]?.next);
+  }
+  if (!node) throw new Error('INVALID_FLOW_DESTINATION');
+  return node;
+}
+export function captureAnswer(text: string, choice?: string) {
+  const value = text.trim();
+  return !choice && value.length > 0 && value.length <= 120 && !/[\u0000-\u001f\u007f]/.test(value)
+    ? value
+    : null;
 }
