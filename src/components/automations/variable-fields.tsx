@@ -194,9 +194,13 @@ export function VariableMessage({
           placeholder="Escribí el mensaje que verá en WhatsApp"
         />
       </label>
-      <Button type="button" variant="outline" onClick={() => setShow(!show)} aria-expanded={show}>
-        {'{ } Insertar variable'}
-      </Button>
+      <div className="flow-message-tools">
+        {' '}
+        <Button type="button" variant="outline" onClick={() => setShow(!show)} aria-expanded={show}>
+          {'{ } Insertar variable'}
+        </Button>
+        <span className="flow-help">{value.length} / 900</span>
+      </div>
       {show && (
         <div className="variable-picker" aria-label="Variables disponibles">
           {definitions.length ? (
@@ -242,10 +246,6 @@ export function VariableMessage({
           {insertError}
         </p>
       )}
-      <p className="flow-help">
-        {value.length} / 900 caracteres. Las referencias {'{{variable}}'} se sustituyen antes de
-        enviar. El mensaje completo debe caber en 900 caracteres.
-      </p>
       <details className="variable-preview">
         <summary>Vista previa con valores de ejemplo</summary>
         <p className="flow-help">

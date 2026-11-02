@@ -44,7 +44,9 @@ export function VariableManager({
   createRequest,
   onCreated,
   refreshKey = 0,
+  expanded = false,
 }: {
+  expanded?: boolean;
   refreshKey?: number;
   tenantId: string;
   graph: FlowGraph;
@@ -93,7 +95,12 @@ export function VariableManager({
     name.current?.focus();
     return () => {
       el.close();
-      if (previous instanceof HTMLElement && previous.isConnected) previous.focus();
+      if (
+        previous instanceof HTMLElement &&
+        previous.isConnected &&
+        previous.getClientRects().length
+      )
+        previous.focus();
     };
   }, [isOpen]);
   function open(row?: Row, duplicate = false) {
@@ -140,7 +147,7 @@ export function VariableManager({
   }
   return (
     <section className="flow-card variable-manager">
-      <details>
+      <details open={expanded}>
         <summary>Variables {data ? `(${data.variables.length})` : ''}</summary>
         <p className="flow-help">
           Catálogo compartido por la empresa. Cada cliente conserva sus propios valores por

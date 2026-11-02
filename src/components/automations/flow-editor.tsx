@@ -1,7 +1,18 @@
 'use client';
 import { useEffect, useState, useRef, type ReactNode } from 'react';
 import Link from 'next/link';
-import { GitBranch, Plus, Save, Play, Pause, FlaskConical, Trash2 } from 'lucide-react';
+import {
+  GitBranch,
+  Plus,
+  Save,
+  Play,
+  Pause,
+  FlaskConical,
+  Trash2,
+  Braces,
+  CircleHelp,
+  Search,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { whatsappRequest } from '@/components/whatsapp/http';
 import {
@@ -17,6 +28,8 @@ import {
   operators,
   type VariableDefinition,
 } from '@/modules/automations/variables';
+import { InboxNavigationToggle } from '@/components/platform/inbox-navigation';
+import { WorkspaceDrawer } from './workspace-drawer';
 import { FlowSimulator } from './simulator';
 type FlowData = {
   variables: VariableDefinition[];
@@ -46,6 +59,7 @@ const kindLabels = {
   handoff: 'Derivar al equipo',
 };
 export function AutomationPanel({ tenantId }: { tenantId: string }) {
+  const [emptyVariablesOpen, setEmptyVariablesOpen] = useState(false);
   const [accounts, setAccounts] = useState<Accounts | null>(null);
   const [selected, setSelected] = useState('');
   const [dirty, setDirty] = useState(false);
@@ -71,57 +85,20 @@ export function AutomationPanel({ tenantId }: { tenantId: string }) {
     return () => controller.abort();
   }, [tenantId, attempt]);
   return (
-    <div className="flow-page">
-      <section className="channel-intro">
-        <span className="icon-tile">
-          <GitBranch size={25} />
-        </span>
-        <div>
-          <h2>Una pregunta. Un camino claro.</h2>
-          <p>
-            Diseñá consultas guiadas para WhatsApp. Probá el recorrido y publicalo cuando esté
-            listo.
-          </p>
-        </div>
-      </section>
-      {!accounts ? (
-        error ? (
-          <div className="form-error" role="alert">
-            {error}
-            <Button
-              variant="outline"
-              onClick={() => {
-                setError('');
-                setAttempt(attempt + 1);
-              }}
-            >
-              Reintentar
-            </Button>
+    <div className="flow-page flow-studio">
+      <header className="flow-studio-header">
+        <div className="flow-studio-title">
+          <InboxNavigationToggle />
+          <div>
+            <h1>Automatizaciones</h1>
+            <p>Diseñá y probá el recorrido de tus clientes.</p>
           </div>
-        ) : (
-          <p role="status">Cargando números…</p>
-        )
-      ) : !accounts.accounts.length ? (
-        <>
-          <VariableManager
-            tenantId={tenantId}
-            graph={empty}
-            canEdit={accounts.canEdit}
-            createRequest={0}
-            onChange={() => {}}
-            onCreated={() => {}}
-          />
-          <section className="flow-card">
-            <h2>Primero conectá un número</h2>
-            <p>Los flujos se publican por número de WhatsApp.</p>
-            <Link href="/dashboard/canales">Ir a Canales →</Link>
-          </section>
-        </>
-      ) : (
-        <>
-          <label className="flow-account">
-            Número de WhatsApp
+        </div>
+        {accounts && accounts.accounts.length > 0 && (
+          <label className="flow-channel">
+            <span className="sr-only">Número de WhatsApp</span>
             <select
+              aria-label="Número de WhatsApp"
               disabled={working}
               value={selected}
               onChange={(event) => {
@@ -142,6 +119,53 @@ export function AutomationPanel({ tenantId }: { tenantId: string }) {
               ))}
             </select>
           </label>
+        )}
+      </header>
+      {!accounts ? (
+        error ? (
+          <div className="form-error" role="alert">
+            {error}
+            <Button
+              variant="outline"
+              onClick={() => {
+                setError('');
+                setAttempt(attempt + 1);
+              }}
+            >
+              Reintentar
+            </Button>
+          </div>
+        ) : (
+          <p role="status">Cargando números…</p>
+        )
+      ) : !accounts.accounts.length ? (
+        <>
+          <WorkspaceDrawer
+            open={emptyVariablesOpen}
+            onClose={() => setEmptyVariablesOpen(false)}
+            title="Variables"
+          >
+            <VariableManager
+              expanded
+              tenantId={tenantId}
+              graph={empty}
+              canEdit={accounts.canEdit}
+              createRequest={0}
+              onChange={() => {}}
+              onCreated={() => {}}
+            />
+          </WorkspaceDrawer>
+          <section className="flow-card">
+            <h2>Primero conectá un número</h2>
+            <p>Los flujos se publican por número de WhatsApp.</p>
+            <Link href="/dashboard/canales">Ir a Canales →</Link>
+            <Button type="button" variant="outline" onClick={() => setEmptyVariablesOpen(true)}>
+              Administrar variables
+            </Button>
+          </section>
+        </>
+      ) : (
+        <>
           {selected && (
             <FlowEditor
               key={selected}
@@ -168,12 +192,20 @@ function FlowEditor({
   onBusy: (value: boolean) => void;
 }) {
   const [data, setData] = useState<FlowData | null>(null);
+  const [variablesOpen, setVariablesOpen] = useState(false),
+    [helpOpen, setHelpOpen] = useState(false),
+    [issuesOpen, setIssuesOpen] = useState(false);
+  const [mobilePanel, setMobilePanel] = useState<'tree' | 'step'>('tree');
+  const [treeQuery, setTreeQuery] = useState('');
+  const inspector = useRef<HTMLElement>(null);
   const editorHeading = useRef<HTMLHeadingElement>(null);
   const treeHeading = useRef<HTMLHeadingElement>(null);
   const selectStep = (id: string) => {
     setSelected(id);
+    setMobilePanel('step');
     requestAnimationFrame(() => {
-      if (matchMedia('(max-width: 1000px)').matches) editorHeading.current?.focus();
+      if (inspector.current) inspector.current.scrollTop = 0;
+      editorHeading.current?.focus({ preventScroll: true });
     });
   };
   const [registryRefresh, setRegistryRefresh] = useState(0);
@@ -366,86 +398,169 @@ function FlowEditor({
       )}
     </section>
   ) : (
-    <>
-      <VariableManager
-        tenantId={tenantId}
-        graph={graph}
-        canEdit={canEdit}
-        createRequest={createRequest}
-        refreshKey={registryRefresh + (data.flow?.revision ?? 0)}
-        onChange={(variables) => edit({ ...graph, variables, schemaVersion: 2 })}
-        onCreated={(variable) => {
-          const id = quickNode.current;
-          quickNode.current = '';
-          if (id)
-            setGraph((current) => ({
-              ...current,
-              nodes: current.nodes.map((n) =>
-                n.id === id ? { ...n, variable: variable.identifier } : n,
-              ),
-            }));
-        }}
-      />
+    <div className="flow-editor-shell">
+      <WorkspaceDrawer
+        open={variablesOpen}
+        onClose={() => setVariablesOpen(false)}
+        title="Variables"
+      >
+        {' '}
+        <VariableManager
+          expanded
+          tenantId={tenantId}
+          graph={graph}
+          canEdit={canEdit}
+          createRequest={createRequest}
+          refreshKey={registryRefresh + (data.flow?.revision ?? 0)}
+          onChange={(variables) => edit({ ...graph, variables, schemaVersion: 2 })}
+          onCreated={(variable) => {
+            const id = quickNode.current;
+            quickNode.current = '';
+            if (id) setVariablesOpen(false);
+            if (id)
+              setGraph((current) => ({
+                ...current,
+                nodes: current.nodes.map((n) =>
+                  n.id === id ? { ...n, variable: variable.identifier } : n,
+                ),
+              }));
+          }}
+        />
+      </WorkspaceDrawer>
+      <WorkspaceDrawer
+        open={helpOpen}
+        onClose={() => setHelpOpen(false)}
+        title="Ayuda del constructor"
+      >
+        <p>
+          Elegí un paso en el árbol para editar su mensaje y sus destinos. Guardá el borrador, probá
+          el recorrido y publicá cuando esté listo.
+        </p>
+        <h3>Borrador y publicación</h3>
+        <p>
+          Guardar conserva tu trabajo; publicar activa esa versión para próximos mensajes. Un flujo
+          por número. Las conversaciones existentes siguen bajo atención humana hasta reanudarlas.
+        </p>
+        <h3>Variables</h3>
+        <p>
+          El catálogo pertenece a la empresa. Cada ejecución guarda sus propios valores. Los cambios
+          del catálogo necesitan republicarse para afectar la automatización.
+        </p>
+        <h3>WhatsApp</h3>
+        <p>
+          Las respuestas automáticas funcionan dentro de las 24 horas del último mensaje del
+          cliente. Fuera de esa ventana se usan plantillas aprobadas. Los mensajes ya enviados no se
+          pueden retirar.
+        </p>
+        {!data.canEdit && (
+          <p>
+            Solo propietarios y administradores pueden editar. Podés revisar el árbol y simularlo.
+          </p>
+        )}
+      </WorkspaceDrawer>
+      <WorkspaceDrawer open={issuesOpen} onClose={() => setIssuesOpen(false)} title="Revisar flujo">
+        <div id="flow-issues">
+          <p>
+            {issues.length
+              ? 'Corregí estas configuraciones antes de probar o publicar.'
+              : 'Los pasos tienen mensajes y destinos válidos. Probá el recorrido antes de publicarlo.'}
+          </p>
+          <ul>
+            {issues.map((issue, index) => (
+              <li key={index}>{issue}</li>
+            ))}
+          </ul>
+        </div>
+      </WorkspaceDrawer>
       <form
         onSubmit={(event) => {
           event.preventDefault();
           void persist('save');
         }}
         className="flow-workspace"
+        onPointerDown={(event) => {
+          for (const menu of event.currentTarget.querySelectorAll<HTMLDetailsElement>(
+            '.flow-tree-tools details[open]',
+          ))
+            if (!menu.contains(event.target as Node)) menu.open = false;
+        }}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') {
+            const menu = event.currentTarget.querySelector<HTMLDetailsElement>(
+              '.flow-tree-tools details[open]',
+            );
+            if (menu) {
+              event.preventDefault();
+              menu.open = false;
+              menu.querySelector('summary')?.focus();
+            }
+          }
+        }}
       >
         <div className="flow-toolbar flow-card">
-          <label>
-            Nombre del flujo
-            <input
-              maxLength={80}
-              disabled={!canEdit}
-              value={graph.name}
-              onChange={(event) => edit({ ...graph, name: event.target.value })}
-              placeholder="Ej.: Consultas de mi negocio"
-            />
-          </label>
-          <div className="flow-status">
-            <span className="small-badge">
-              {data.flow?.enabled
-                ? data.runtimeIssue
-                  ? 'Publicado · Requiere revisión'
-                  : 'Publicado · Activo'
-                : data.flow?.published
-                  ? 'Publicado · Pausado'
-                  : 'Sin publicar'}
-            </span>
-            <span>
-              {dirty
-                ? 'Cambios sin guardar'
-                : data.flow
-                  ? 'Borrador guardado'
-                  : 'Todavía no hay borrador'}
-              {data.flow?.published ? ` · Versión ${data.flow.publishedVersion}` : ''}
-            </span>
+          <div className="flow-identity">
+            <label>
+              <span className="sr-only">Nombre del flujo</span>
+              <input
+                maxLength={80}
+                disabled={!canEdit}
+                value={graph.name}
+                onChange={(event) => edit({ ...graph, name: event.target.value })}
+                placeholder="Ej.: Consultas de mi negocio"
+              />
+            </label>
+            <div className="flow-status">
+              <span className="small-badge">
+                {data.flow?.enabled
+                  ? data.runtimeIssue
+                    ? 'Publicado · Requiere revisión'
+                    : 'Publicado · Activo'
+                  : data.flow?.published
+                    ? 'Publicado · Pausado'
+                    : 'Sin publicar'}
+              </span>
+              <span>
+                {dirty
+                  ? 'Cambios sin guardar'
+                  : data.flow
+                    ? 'Borrador guardado'
+                    : 'Todavía no hay borrador'}
+                {data.flow?.published ? ` · Versión ${data.flow.publishedVersion}` : ''}
+              </span>
+            </div>
           </div>
           <div className="flow-actions">
-            <Button type="submit" variant="outline" disabled={!canEdit || !dirty}>
+            <Button
+              type="submit"
+              variant="outline"
+              aria-label="Guardar borrador"
+              title="Guardar borrador"
+              disabled={!canEdit || !dirty}
+            >
               <Save size={15} />
-              Guardar borrador
+              <span className="flow-action-text">Guardar</span>
             </Button>
             <Button
               type="button"
               variant="outline"
               disabled={busy || issues.length > 0}
-              aria-describedby="flow-issues"
+              aria-label="Probar recorrido"
+              title="Probar recorrido"
+              aria-describedby="flow-review-help"
               onClick={() => setSimulator(true)}
             >
               <FlaskConical size={15} />
-              Probar recorrido
+              <span className="flow-action-text">Probar</span>
             </Button>
             <Button
               type="button"
               disabled={busy || Boolean(publishReason)}
+              aria-label="Publicar y activar"
               aria-describedby="flow-publish-help"
               onClick={() => void persist('publish')}
             >
               <Play size={15} />
-              Publicar y activar
+              Publicar
             </Button>
             {data.flow?.published && (
               <Button
@@ -454,29 +569,58 @@ function FlowEditor({
                 disabled={
                   !canEdit || (!data.flow.enabled && (!data.channelReady || !data.processorReady))
                 }
+                aria-label={data.flow.enabled ? 'Pausar flujo' : 'Reactivar publicado'}
+                title={data.flow.enabled ? 'Pausar flujo' : 'Reactivar publicado'}
                 onClick={() => void persist(data.flow!.enabled ? 'pause' : 'enable')}
               >
                 {data.flow.enabled ? <Pause size={15} /> : <Play size={15} />}
-                {data.flow.enabled ? 'Pausar flujo' : 'Reactivar publicado'}
+                <span className="flow-action-text">
+                  {data.flow.enabled ? 'Pausar' : 'Reactivar'}
+                </span>
               </Button>
             )}
           </div>
-          <p id="flow-publish-help" className="flow-help">
-            {busy
-              ? 'Guardando cambios…'
-              : publishReason ||
-                'Al publicar, este número responderá a próximos mensajes entrantes. Los mensajes ya enviados no se pueden retirar.'}
-          </p>
-          <p className="flow-help">
-            El borrador no modifica las respuestas activas. Un flujo por número; sin IA. Dentro de
-            las 24 horas del último mensaje del cliente. Para iniciar fuera de esa ventana, usá una
-            plantilla aprobada.
-          </p>
-          {!data.canEdit && (
-            <p className="flow-help">
-              Podés revisar y simular el árbol. Solo un administrador o propietario puede editarlo.
+          <div className="flow-utilities">
+            <Button
+              type="button"
+              variant="outline"
+              aria-label="Variables"
+              title={`Variables (${graph.variables?.length ?? 0})`}
+              onClick={() => setVariablesOpen(true)}
+            >
+              <Braces size={17} />
+              <span className="flow-action-text">Variables</span>
+              <small>{graph.variables?.length ?? 0}</small>
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label="Ayuda del constructor"
+              title="Ayuda del constructor"
+              onClick={() => setHelpOpen(true)}
+            >
+              <CircleHelp size={18} />
+            </Button>
+          </div>
+          <div className="flow-toolbar-feedback">
+            <p id="flow-publish-help" className="flow-help">
+              {busy
+                ? 'Guardando cambios…'
+                : publishReason || 'Guardá y probá el borrador antes de publicar.'}
             </p>
-          )}
+            <span id="flow-review-help">
+              {issues.length > 0 && (
+                <button
+                  type="button"
+                  className="flow-review-button"
+                  onClick={() => setIssuesOpen(true)}
+                >
+                  Revisar {issues.length} {issues.length === 1 ? 'aviso' : 'avisos'}
+                </button>
+              )}
+            </span>
+          </div>
           {data.runtimeIssue && (
             <p className="form-error" role="status">
               {data.runtimeIssue}
@@ -507,45 +651,31 @@ function FlowEditor({
             </p>
           )}
         </div>
-        <Button
-          type="button"
-          variant="outline"
-          disabled={!canEdit}
-          className="variable-example-button"
-          onClick={async () => {
-            if (
-              graph.nodes.length &&
-              !confirm(
-                '¿Reemplazar el borrador por un ejemplo ficticio? La publicación actual no cambia.',
-              )
-            )
-              return;
-            setBusy(true);
-            onBusy(true);
-            setError('');
-            try {
-              const result = await whatsappRequest<{ example: FlowGraph }>(
-                `/api/workspaces/${tenantId}/automation-variables`,
-                'POST',
-                { action: 'example' },
-              );
-              edit(result.example);
-              setRegistryRefresh((n) => n + 1);
-              setSelected(result.example.start);
-              setNotice(
-                'Ejemplo ficticio cargado. Revisá sus textos y valores antes de guardar o publicar.',
-              );
-            } catch (e) {
-              setError(e instanceof Error ? e.message : 'No pudimos cargar el ejemplo.');
-            } finally {
-              setBusy(false);
-              onBusy(false);
-            }
-          }}
-        >
-          Cargar ejemplo de variables y confirmación
-        </Button>
-        <div className="flow-columns">
+        <div className="flow-mobile-tabs" aria-label="Vista del constructor">
+          <Button
+            type="button"
+            variant="ghost"
+            aria-pressed={mobilePanel === 'tree'}
+            onClick={() => {
+              setMobilePanel('tree');
+              requestAnimationFrame(() => treeHeading.current?.focus({ preventScroll: true }));
+            }}
+          >
+            Árbol
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            aria-pressed={mobilePanel === 'step'}
+            onClick={() => {
+              setMobilePanel('step');
+              requestAnimationFrame(() => editorHeading.current?.focus({ preventScroll: true }));
+            }}
+          >
+            Editar paso
+          </Button>
+        </div>
+        <div className="flow-columns" data-view={mobilePanel}>
           <section className="flow-card flow-tree-panel">
             <div className="flow-heading">
               <h2 ref={treeHeading} tabIndex={-1}>
@@ -553,6 +683,90 @@ function FlowEditor({
               </h2>
               <span>{graph.nodes.length} / 30 pasos</span>
             </div>
+            <div className="flow-tree-tools">
+              {' '}
+              <fieldset disabled={!canEdit || graph.nodes.length >= 30} className="flow-add">
+                <legend className="sr-only">Agregar paso</legend>
+                <details className="flow-add-menu">
+                  <summary>+ Agregar paso</summary>
+                  <div>
+                    {(
+                      ['menu', 'capture', 'condition', 'assign', 'message', 'handoff'] as const
+                    ).map((kind) => (
+                      <Button
+                        key={kind}
+                        type="button"
+                        variant="outline"
+                        onClick={(event) => {
+                          event.currentTarget.closest('details')?.removeAttribute('open');
+                          add(kind);
+                        }}
+                      >
+                        <Plus size={14} />
+                        {kindLabels[kind]}
+                      </Button>
+                    ))}
+                  </div>
+                </details>{' '}
+              </fieldset>
+              {graph.nodes.length >= 30 && (
+                <p className="flow-help">Llegaste al máximo de 30 pasos.</p>
+              )}
+              <details className="flow-examples">
+                <summary>Ejemplos</summary>
+                <div>
+                  {' '}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={!canEdit}
+                    className="variable-example-button"
+                    onClick={async (event) => {
+                      event.currentTarget.closest('details')?.removeAttribute('open');
+                      if (
+                        graph.nodes.length &&
+                        !confirm(
+                          '¿Reemplazar el borrador por un ejemplo ficticio? La publicación actual no cambia.',
+                        )
+                      )
+                        return;
+                      setBusy(true);
+                      onBusy(true);
+                      setError('');
+                      try {
+                        const result = await whatsappRequest<{ example: FlowGraph }>(
+                          `/api/workspaces/${tenantId}/automation-variables`,
+                          'POST',
+                          { action: 'example' },
+                        );
+                        edit(result.example);
+                        setRegistryRefresh((n) => n + 1);
+                        setSelected(result.example.start);
+                        setNotice(
+                          'Ejemplo ficticio cargado. Revisá sus textos y valores antes de guardar o publicar.',
+                        );
+                      } catch (e) {
+                        setError(e instanceof Error ? e.message : 'No pudimos cargar el ejemplo.');
+                      } finally {
+                        setBusy(false);
+                        onBusy(false);
+                      }
+                    }}
+                  >
+                    Cargar ejemplo de variables y confirmación
+                  </Button>
+                </div>
+              </details>
+            </div>
+            <label className="flow-tree-search">
+              <Search size={15} />
+              <span className="sr-only">Buscar un paso</span>
+              <input
+                value={treeQuery}
+                onChange={(event) => setTreeQuery(event.target.value)}
+                placeholder="Buscar un paso…"
+              />
+            </label>
             {!graph.nodes.length ? (
               <div className="flow-empty">
                 <GitBranch size={36} />
@@ -592,7 +806,28 @@ function FlowEditor({
                   </select>
                 </label>
                 <div className="flow-tree" aria-label="Conexiones del árbol">
-                  <ol>{tree}</ol>
+                  {treeQuery ? (
+                    <div className="flow-search-results">
+                      {graph.nodes
+                        .filter((n) => n.label.toLowerCase().includes(treeQuery.toLowerCase()))
+                        .map((n) => (
+                          <button
+                            key={n.id}
+                            type="button"
+                            className={`flow-node ${selected === n.id ? 'selected' : ''}`}
+                            onClick={() => selectStep(n.id)}
+                          >
+                            {n.label}
+                            <small>{kindLabels[n.kind]}</small>
+                          </button>
+                        ))}
+                      {!graph.nodes.some((n) =>
+                        n.label.toLowerCase().includes(treeQuery.toLowerCase()),
+                      ) && <p>Sin coincidencias.</p>}
+                    </div>
+                  ) : (
+                    <ol>{tree}</ol>
+                  )}
                   {graph.nodes.some((n) => !visited.has(n.id)) && (
                     <div className="flow-unlinked">
                       <h3>Pasos sin conectar</h3>
@@ -613,22 +848,8 @@ function FlowEditor({
                 </div>
               </>
             )}
-            <fieldset disabled={!canEdit || graph.nodes.length >= 30} className="flow-add">
-              <legend>Agregar paso</legend>
-              {(['menu', 'capture', 'condition', 'assign', 'message', 'handoff'] as const).map(
-                (kind) => (
-                  <Button key={kind} type="button" variant="outline" onClick={() => add(kind)}>
-                    <Plus size={14} />
-                    {kindLabels[kind]}
-                  </Button>
-                ),
-              )}
-            </fieldset>
-            {graph.nodes.length >= 30 && (
-              <p className="flow-help">Llegaste al máximo de 30 pasos.</p>
-            )}
           </section>
-          <section className="flow-card flow-step">
+          <section className="flow-card flow-step" ref={inspector} aria-label="Editor del paso">
             <div className="flow-heading">
               <h2 ref={editorHeading} tabIndex={-1}>
                 {node ? 'Editar paso' : 'Elegí un paso del árbol'}
@@ -636,7 +857,10 @@ function FlowEditor({
               <button
                 type="button"
                 className="flow-back-tree"
-                onClick={() => treeHeading.current?.focus()}
+                onClick={() => {
+                  setMobilePanel('tree');
+                  requestAnimationFrame(() => treeHeading.current?.focus({ preventScroll: true }));
+                }}
               >
                 Volver al árbol ↑
               </button>
@@ -716,25 +940,47 @@ function FlowEditor({
                         Este tipo de paso usa destinos fijos: no se agregan ni se quitan opciones.
                       </p>
                     )}
-                    {node.kind !== 'assign' && (
-                      <VariableSelect
-                        definitions={graph.variables ?? []}
-                        value={node.variable ?? ''}
-                        optional={node.kind === 'menu'}
-                        label={
-                          node.kind === 'condition'
-                            ? 'Variable a evaluar'
-                            : 'Guardar respuesta en variable'
-                        }
-                        onChange={(variable) =>
-                          updateNode({ ...node, variable: variable || undefined })
-                        }
-                        onCreate={() => {
-                          quickNode.current = node.id;
-                          setCreateRequest((n) => n + 1);
-                        }}
-                      />
-                    )}
+                    {node.kind === 'menu' ? (
+                      <details className="flow-save-answer" open={Boolean(node.variable)}>
+                        <summary>Guardar selección en variable · opcional</summary>{' '}
+                        <VariableSelect
+                          definitions={graph.variables ?? []}
+                          value={node.variable ?? ''}
+                          optional
+                          label="Guardar respuesta en variable"
+                          onChange={(variable) =>
+                            updateNode({ ...node, variable: variable || undefined })
+                          }
+                          onCreate={() => {
+                            setVariablesOpen(true);
+                            quickNode.current = node.id;
+                            setCreateRequest((n) => n + 1);
+                          }}
+                        />
+                      </details>
+                    ) : node.kind !== 'assign' ? (
+                      <>
+                        {' '}
+                        <VariableSelect
+                          definitions={graph.variables ?? []}
+                          value={node.variable ?? ''}
+                          optional={false}
+                          label={
+                            node.kind === 'condition'
+                              ? 'Variable a evaluar'
+                              : 'Guardar respuesta en variable'
+                          }
+                          onChange={(variable) =>
+                            updateNode({ ...node, variable: variable || undefined })
+                          }
+                          onCreate={() => {
+                            setVariablesOpen(true);
+                            quickNode.current = node.id;
+                            setCreateRequest((n) => n + 1);
+                          }}
+                        />
+                      </>
+                    ) : null}
                     {node.kind === 'capture' && (
                       <p className="flow-help">
                         La respuesta se valida según el tipo elegido (hasta 120 caracteres). MENÚ e
@@ -786,10 +1032,13 @@ function FlowEditor({
                       </>
                     )}
                     {node.kind === 'menu' && (
-                      <p className="flow-help">
-                        Hasta 3 opciones se envían como botones; de 4 a 10, como lista. El cliente
-                        también puede responder con el número de opción.
-                      </p>
+                      <details className="flow-inline-help">
+                        <summary>Cómo se muestran las opciones en WhatsApp</summary>
+                        <p className="flow-help">
+                          Hasta 3 opciones se envían como botones; de 4 a 10, como lista. El cliente
+                          también puede responder con el número de opción.
+                        </p>
+                      </details>
                     )}
                     {node.options.map((option, index) => (
                       <div className="flow-option" key={option.id}>
@@ -961,26 +1210,22 @@ function FlowEditor({
             ) : (
               <p>Las conexiones muestran qué respuesta sigue después de cada opción.</p>
             )}
-            <div id="flow-issues" className={issues.length ? 'flow-validation' : 'flow-valid'}>
-              <h3>{issues.length ? 'Antes de publicar' : 'Recorrido listo para probar'}</h3>
-              {issues.length ? (
-                <ul>
-                  {issues.map((issue, index) => (
-                    <li key={index}>{issue}</li>
-                  ))}
-                </ul>
-              ) : (
-                <p>
-                  Los pasos tienen mensajes y destinos válidos. Revisá el contenido en el simulador.
-                </p>
-              )}
-            </div>
+            <button
+              type="button"
+              className="flow-inspector-review"
+              onClick={() => setIssuesOpen(true)}
+            >
+              {issues.length
+                ? `${issues.length} avisos antes de publicar`
+                : 'Recorrido listo para probar'}{' '}
+              →
+            </button>
           </section>
         </div>
       </form>
       {simulator && (
         <FlowSimulator graph={structuredClone(graph)} onClose={() => setSimulator(false)} />
       )}
-    </>
+    </div>
   );
 }

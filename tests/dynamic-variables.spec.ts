@@ -333,7 +333,7 @@ test('UI: catálogo, errores conservan formulario, insertar al cursor y simulaci
   await f.api.post('/api/workspaces/active', { data: { tenantId: f.tenant.id } });
   await page.context().addCookies((await f.api.storageState()).cookies);
   await page.goto('/dashboard/automatizaciones');
-  await page.locator('.variable-manager > details > summary').click();
+  await page.getByRole('button', { name: 'Variables', exact: true }).click();
   await page.getByRole('button', { name: '+ Nueva variable', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Nueva variable', exact: true });
   await dialog.getByLabel('Nombre descriptivo').fill('Nombre de prueba');
@@ -371,10 +371,14 @@ test('UI: catálogo, errores conservan formulario, insertar al cursor y simulaci
     page.getByRole('button', { name: 'Eliminar nombre_prueba_copia1', exact: true }),
   ).toHaveCount(0);
 
+  await page.getByRole('button', { name: 'Cerrar variables', exact: true }).click();
+  await page.locator('.flow-examples > summary').click();
   await page
     .getByRole('button', { name: 'Cargar ejemplo de variables y confirmación', exact: true })
     .click();
   await expect(page.getByLabel('Título del paso')).toHaveValue('Red social');
+  if (testInfo.project.name === 'mobile')
+    await page.getByRole('button', { name: 'Editar paso', exact: true }).click();
   const message = page.getByLabel('Mensaje para el cliente', { exact: true });
   const original = await message.inputValue();
   await message.fill('Hola !');
@@ -407,6 +411,8 @@ test('UI: catálogo, errores conservan formulario, insertar al cursor y simulaci
   await page
     .getByRole('combobox', { name: 'Guardar respuesta en variable', exact: true })
     .selectOption('red_social');
+  if (testInfo.project.name === 'mobile')
+    await page.getByRole('button', { name: 'Árbol', exact: true }).click();
   await page.locator('.flow-node').filter({ hasText: 'Cantidad' }).first().click();
   const option = page
     .locator('.variable-option-extra')

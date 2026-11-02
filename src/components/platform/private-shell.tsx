@@ -36,7 +36,7 @@ export function PrivateShell({
     () => window.matchMedia(mobileQuery).matches,
     () => false,
   );
-  const inbox = path === '/dashboard/conversaciones';
+  const inbox = path === '/dashboard/conversaciones' || path === '/dashboard/automatizaciones';
   const visible = mobile ? open : !inbox || !collapsed;
   const sidebar = useRef<HTMLElement>(null);
   function closeNavigation() {
