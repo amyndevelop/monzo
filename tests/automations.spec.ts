@@ -387,6 +387,8 @@ test('UI: borrador, validación, simulador con foco y árbol en escritorio/móvi
   ).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(simulator).toBeFocused();
+  if (testInfo.project.name === 'mobile')
+    await page.getByRole('button', { name: 'Editar paso', exact: true }).click();
   await page.getByLabel('Mensaje para el cliente').fill('Bienvenida revisada');
   await page.route('**/automations/' + f.account.id, async (route) => {
     if (route.request().method() === 'POST')

@@ -42,6 +42,8 @@ export default async function Section({
         />
       </>
     );
+  if (section === 'automatizaciones')
+    return <AutomationPanel key={context.tenant.id} tenantId={context.tenant.id} />;
   return (
     <>
       <div className="dashboard-page-title">
@@ -56,8 +58,6 @@ export default async function Section({
       </div>
       {section === 'canales' ? (
         <ChannelsPanel tenantId={context.tenant.id} />
-      ) : section === 'automatizaciones' ? (
-        <AutomationPanel key={context.tenant.id} tenantId={context.tenant.id} />
       ) : section === 'analiticas' ? (
         <AnalyticsPanel key={context.tenant.id} tenantId={context.tenant.id} />
       ) : section === 'agentes-ia' ? (
