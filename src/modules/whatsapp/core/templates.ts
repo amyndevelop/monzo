@@ -40,10 +40,17 @@ function placeholders(text: string) {
   ];
 }
 function templateAccount(account: {
+  provider?: string;
   enabled: boolean;
   tokenEncrypted: string | null;
   lastErrorCode: string | null;
 }) {
+  if (account.provider === 'BAILEYS')
+    throw new TemplateError(
+      409,
+      'UNSUPPORTED_PROVIDER',
+      'Las plantillas de Meta no están disponibles en conexiones QR.',
+    );
   if (!account.enabled || !account.tokenEncrypted || account.lastErrorCode === 'META_190')
     throw new TemplateError(
       409,

@@ -11,12 +11,34 @@ import {
 } from './meta';
 import { withinWindow } from './payload';
 import { checkQueuedTemplate, templateComponents } from './templates';
-export async function processOutbound(db: PrismaClient, messageId: string, transport?: MetaFetch) {
+export type WebTransport = {
+  owner: string;
+  send: (
+    accountId: string,
+    generation: number,
+    to: string,
+    text: string,
+    messageId: string,
+  ) => Promise<string>;
+};
+export async function processOutbound(
+  db: PrismaClient,
+  messageId: string,
+  transport?: MetaFetch,
+  web?: WebTransport,
+) {
   const candidate = await db.message.findUnique({
     where: { id: messageId },
-    select: { tenantId: true, type: true },
+    select: { tenantId: true, type: true, account: { select: { provider: true } } },
   });
-  if (!candidate) return;
+  if (!candidate || (candidate.account.provider === 'BAILEYS') !== Boolean(web)) return;
+  if (web && !['text', 'interactive'].includes(candidate.type)) {
+    await db.message.updateMany({
+      where: { id: messageId, status: 'QUEUED' },
+      data: { status: 'FAILED', errorCode: 'QR_UNSUPPORTED_TYPE' },
+    });
+    return;
+  }
   const checkedTemplate =
     candidate.type === 'template' ? await checkQueuedTemplate(db, messageId, transport) : null;
   if (candidate.type === 'template' && !checkedTemplate) return;
@@ -24,9 +46,23 @@ export async function processOutbound(db: PrismaClient, messageId: string, trans
     await tx.$queryRaw`SELECT "id" FROM "Tenant" WHERE "id"=${candidate.tenantId} FOR UPDATE`;
     const message = await tx.message.findUnique({
       where: { id: messageId },
-      include: { account: true, template: true, conversation: { include: { contact: true } } },
+      include: {
+        account: { include: { webSession: true } },
+        template: true,
+        conversation: { include: { contact: true } },
+      },
     });
     if (!message || message.direction !== 'OUTBOUND' || message.status !== 'QUEUED') return null;
+    if (
+      web &&
+      (!message.account.webSession ||
+        message.account.webSession.state !== 'CONNECTED' ||
+        message.account.webSession.desiredState !== 'CONNECTED' ||
+        message.account.webSession.leaseOwner !== web.owner ||
+        !message.account.webSession.leaseUntil ||
+        message.account.webSession.leaseUntil.getTime() <= Date.now())
+    )
+      return null;
     const membership = message.createdByUserId
       ? await tx.membership.findUnique({
           where: {
@@ -61,9 +97,9 @@ export async function processOutbound(db: PrismaClient, messageId: string, trans
         : null;
     const problem = !membership
       ? 'MEMBERSHIP_REVOKED'
-      : !message.account.enabled || !message.account.tokenEncrypted
+      : !message.account.enabled || (!web && !message.account.tokenEncrypted)
         ? 'ACCOUNT_DISABLED'
-        : message.type !== 'template' && !withinWindow(message.conversation.lastInboundAt)
+        : !web && message.type !== 'template' && !withinWindow(message.conversation.lastInboundAt)
           ? 'WINDOW_CLOSED'
           : message.account.lastErrorCode === 'META_190'
             ? 'CREDENTIALS_UNAVAILABLE'
@@ -97,13 +133,14 @@ export async function processOutbound(db: PrismaClient, messageId: string, trans
       });
       return null;
     }
-    let token: string;
+    let token = '';
     try {
-      token = decryptToken(
-        message.account.tokenEncrypted!,
-        message.tenantId,
-        message.account.phoneNumberId,
-      );
+      if (!web)
+        token = decryptToken(
+          message.account.tokenEncrypted!,
+          message.tenantId,
+          message.account.phoneNumberId,
+        );
     } catch {
       await tx.message.update({
         where: { id: message.id },
@@ -127,13 +164,21 @@ export async function processOutbound(db: PrismaClient, messageId: string, trans
       filename: message.mediaFilename,
       token,
       credentialVersion: message.account.tokenEncrypted!,
+      webGeneration: message.account.webSession?.generation ?? 0,
       automation: snapshot?.success ? snapshot.data : null,
     };
   });
   if (!claimed) return;
   try {
-    const providerId =
-      claimed.type === 'interactive' && claimed.automation
+    const providerId = web
+      ? await web.send(
+          claimed.accountId,
+          claimed.webGeneration,
+          claimed.to,
+          claimed.text,
+          claimed.id,
+        )
+      : claimed.type === 'interactive' && claimed.automation
         ? await sendInteractive(
             claimed.phone,
             claimed.token,

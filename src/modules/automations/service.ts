@@ -26,7 +26,14 @@ export async function getFlow(tenantId: string, accountId: string) {
   const { membership } = await requireTenantAccess(idSchema.parse(tenantId));
   const account = await getDb().whatsappAccount.findFirst({
     where: { id: idSchema.parse(accountId), tenantId },
-    select: { id: true, enabled: true, tokenEncrypted: true, lastErrorCode: true },
+    select: {
+      id: true,
+      enabled: true,
+      tokenEncrypted: true,
+      lastErrorCode: true,
+      provider: true,
+      webSession: { select: { state: true, desiredState: true, leaseUntil: true } },
+    },
   });
   if (!account) throw new RequestError(403, 'No tenés acceso a este número.');
   const flow = await getDb().automationFlow.findUnique({ where: { accountId } });
@@ -62,11 +69,20 @@ export async function getFlow(tenantId: string, accountId: string) {
         : null,
     canEdit: membership.role !== 'MEMBER',
     channelReady:
-      account.enabled && Boolean(account.tokenEncrypted) && account.lastErrorCode !== 'META_190',
+      account.enabled &&
+      (account.provider === 'BAILEYS' || Boolean(account.tokenEncrypted)) &&
+      account.lastErrorCode !== 'META_190',
     processorReady:
-      processorMode() === 'qstash'
-        ? qstashConfigured()
-        : Boolean(heartbeat?.outboundEnabled && heartbeat.seenAt > new Date(Date.now() - 45000)),
+      account.provider === 'BAILEYS'
+        ? Boolean(
+            account.webSession?.state === 'CONNECTED' &&
+            account.webSession.desiredState === 'CONNECTED' &&
+            account.webSession.leaseUntil &&
+            account.webSession.leaseUntil.getTime() > Date.now(),
+          )
+        : processorMode() === 'qstash'
+          ? qstashConfigured()
+          : Boolean(heartbeat?.outboundEnabled && heartbeat.seenAt > new Date(Date.now() - 45000)),
   };
 }
 async function failure<T>(work: () => Promise<T>) {

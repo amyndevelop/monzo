@@ -164,6 +164,8 @@ enum ConversationStatus {
 }
 
 model WhatsappAccount {
+  provider             String                 @default("META")
+  webSession           WhatsappWebSession?
   id                   String                 @id @default(cuid())
   tenantId             String
   tenant               Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Restrict)
@@ -409,4 +411,26 @@ model AutomationVariable {
   updatedAt    DateTime @updatedAt
 
   @@unique([tenantId, identifier])
+}
+
+model WhatsappWebSession {
+  accountId     String          @id
+  tenantId      String
+  account       WhatsappAccount @relation(fields: [accountId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  expectedWaId  String
+  connectedWaId String?
+  desiredState  String          @default("DISCONNECTED")
+  state         String          @default("DISCONNECTED")
+  generation    Int             @default(1)
+  authEncrypted String?
+  qrEncrypted   String?
+  qrExpiresAt   DateTime?
+  leaseOwner    String?
+  leaseUntil    DateTime?
+  lastErrorCode String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@unique([accountId, tenantId])
+  @@index([tenantId])
 }

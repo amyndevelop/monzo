@@ -2,7 +2,11 @@ import { createHash } from 'node:crypto';
 import { Prisma, type PrismaClient, type MessageStatus } from '@prisma/client';
 import { advanceAutomation } from '../../automations/runtime';
 import { envelopeSchema, valueSchema, providerDate } from './payload';
-export async function captureWebhook(db: PrismaClient, raw: Buffer) {
+export async function captureWebhook(
+  db: PrismaClient,
+  raw: Buffer,
+  provider: 'META' | 'BAILEYS' = 'META',
+) {
   const parsed = envelopeSchema.parse(JSON.parse(raw.toString('utf8')));
   const digest = createHash('sha256').update(raw).digest('hex');
   const records: {
@@ -17,9 +21,20 @@ export async function captureWebhook(db: PrismaClient, raw: Buffer) {
       const value = valueSchema.parse(change.value);
       const account = await db.whatsappAccount.findUnique({
         where: { phoneNumberId: value.metadata.phone_number_id },
-        select: { id: true, tenantId: true, businessAccountId: true, enabled: true },
+        select: {
+          id: true,
+          tenantId: true,
+          businessAccountId: true,
+          enabled: true,
+          provider: true,
+        },
       });
-      if (!account?.enabled || account.businessAccountId !== entry.id) continue;
+      if (
+        !account?.enabled ||
+        account.provider !== provider ||
+        account.businessAccountId !== entry.id
+      )
+        continue;
       // Bound the work in each transaction, including when Meta batches many messages.
       // Every chunk belongs to one account; data spanning tenants is never stored together.
       const chunks = [];
@@ -162,13 +177,14 @@ export async function processWebhook(db: PrismaClient, eventId: string) {
                 : {}),
             },
           });
-          await advanceAutomation(tx, account, conversation, {
-            id: savedIncoming.id,
-            text: message.text?.body ?? message.button?.text ?? '',
-            choice: message.interactive?.button_reply?.id ?? message.interactive?.list_reply?.id,
-            at: date,
-            eventId: event.id,
-          });
+          if (account.provider === 'META' || message.type === 'text')
+            await advanceAutomation(tx, account, conversation, {
+              id: savedIncoming.id,
+              text: message.text?.body ?? message.button?.text ?? '',
+              choice: message.interactive?.button_reply?.id ?? message.interactive?.list_reply?.id,
+              at: date,
+              eventId: event.id,
+            });
         }
         for (const receipt of value.statuses ?? []) {
           const next = statusMap[receipt.status];

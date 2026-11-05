@@ -45,7 +45,7 @@ export type ChatSummary = {
   lastMessageAt: string;
   assignedUserId: string | null;
   contact: { id: string; name: string | null; waId: string };
-  account: { id: string; displayPhone: string; enabled: boolean };
+  account: { id: string; displayPhone: string; enabled: boolean; provider?: string };
   messages: ChatMessage[];
 };
 export type ChatThread = {

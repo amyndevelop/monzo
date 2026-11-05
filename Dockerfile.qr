@@ -1,0 +1,21 @@
+# syntax=docker/dockerfile:1
+FROM node:22-bookworm-slim AS base
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates && rm -rf /var/lib/apt/lists/*
+
+FROM base AS build
+WORKDIR /app
+COPY . ./source
+RUN --mount=type=secret,id=proxy_ca \
+    if [ -f /run/secrets/proxy_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
+    cp source/services/whatsapp-qr/package.json source/services/whatsapp-qr/package-lock.json ./ && \
+    npm ci --no-audit --no-fund && \
+    npx prisma generate --schema=source/prisma/schema.prisma && \
+    npx esbuild source/workers/whatsapp-qr.ts --bundle --platform=node --format=esm --packages=external --tsconfig=source/tsconfig.json --outfile=worker.mjs && \
+    npm prune --omit=dev --offline --ignore-scripts --no-audit --no-fund && \
+    mkdir /runtime && mv node_modules worker.mjs package.json /runtime
+
+FROM base
+WORKDIR /app
+COPY --from=build --chown=node:node /runtime/ ./
+USER node
+CMD ["node", "worker.mjs"]

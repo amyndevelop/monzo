@@ -252,6 +252,7 @@ export function Inbox({
     }
   }
   const openWindow = Boolean(thread?.canReply);
+  const qrChannel = thread?.conversation.account.provider === 'BAILEYS';
   const audioAttachment = Boolean(
     attachment &&
     (attachment.type.startsWith('audio/') || /\.(mp3|ogg|m4a|aac)$/i.test(attachment.name)),
@@ -390,6 +391,7 @@ export function Inbox({
               onChange={refreshThread}
             />
             <div className="thread-tools">
+              {qrChannel && <span>Conexión QR · Texto y opciones numeradas</span>}
               <Button type="button" variant="outline" onClick={() => setContactOpen(true)}>
                 Ficha del contacto
               </Button>
@@ -422,10 +424,16 @@ export function Inbox({
               </label>
               <span className={openWindow ? 'window-open' : 'window-closed'}>
                 <Clock3 size={13} />
-                {openWindow ? 'Ventana de atención abierta' : 'Ventana de 24 h cerrada'}
+                {qrChannel
+                  ? openWindow
+                    ? 'Sesión QR conectada'
+                    : 'Sesión QR desconectada'
+                  : openWindow
+                    ? 'Ventana de atención abierta'
+                    : 'Ventana de 24 h cerrada'}
               </span>
             </div>
-            {channel && !channel.processorReady && (
+            {!qrChannel && channel && !channel.processorReady && (
               <p className="thread-notice">
                 Los envíos están en pausa. Los mensajes en cola todavía no se enviaron.
               </p>
@@ -611,16 +619,19 @@ export function Inbox({
               {mode === 'message' && !openWindow ? (
                 <div className="closed-window-copy">
                   <p>
-                    Pasaron más de 24 horas. Usá una plantilla aprobada para retomar la
-                    conversación.
+                    {qrChannel
+                      ? 'La sesión QR está desconectada. Revisá la conexión en Canales.'
+                      : 'Pasaron más de 24 horas. Usá una plantilla aprobada para retomar la conversación.'}
                   </p>
-                  <Button type="button" variant="outline" onClick={() => setTemplateOpen(true)}>
-                    <FileText size={16} /> Elegir plantilla
-                  </Button>
+                  {!qrChannel && (
+                    <Button type="button" variant="outline" onClick={() => setTemplateOpen(true)}>
+                      <FileText size={16} /> Elegir plantilla
+                    </Button>
+                  )}
                 </div>
               ) : (
                 <>
-                  {mode === 'message' && (
+                  {mode === 'message' && !qrChannel && (
                     <input
                       ref={fileInput}
                       tabIndex={-1}
@@ -690,7 +701,7 @@ export function Inbox({
                     </div>
                   )}
                   <div className="composer-row">
-                    {mode === 'message' && (
+                    {mode === 'message' && !qrChannel && (
                       <button
                         type="button"
                         className="composer-icon"
@@ -702,7 +713,7 @@ export function Inbox({
                         <FileText size={21} />
                       </button>
                     )}
-                    {mode === 'message' && (
+                    {mode === 'message' && !qrChannel && (
                       <button
                         type="button"
                         className="composer-icon composer-clip"
