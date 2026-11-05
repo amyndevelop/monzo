@@ -35,7 +35,7 @@ export async function advanceAutomation(
     conversation.automationPaused ||
     conversation.assignedUserId ||
     !account.enabled ||
-    !account.tokenEncrypted ||
+    (account.provider === 'META' && !account.tokenEncrypted) ||
     account.lastErrorCode === 'META_190' ||
     !withinWindow(incoming.at) ||
     (conversation.lastInboundAt && incoming.at < conversation.lastInboundAt)

@@ -448,9 +448,10 @@ function FlowEditor({
         </p>
         <h3>WhatsApp</h3>
         <p>
-          Las respuestas automáticas funcionan dentro de las 24 horas del último mensaje del
-          cliente. Fuera de esa ventana se usan plantillas aprobadas. Los mensajes ya enviados no se
-          pueden retirar.
+          En la API oficial, las respuestas libres funcionan dentro de las 24 horas del último
+          mensaje del cliente; fuera de esa ventana se usan plantillas aprobadas. La conexión QR usa
+          texto y opciones numeradas, sin plantillas de Meta. Los mensajes ya enviados no se pueden
+          retirar.
         </p>
         {!data.canEdit && (
           <p>
@@ -1035,8 +1036,9 @@ function FlowEditor({
                       <details className="flow-inline-help">
                         <summary>Cómo se muestran las opciones en WhatsApp</summary>
                         <p className="flow-help">
-                          Hasta 3 opciones se envían como botones; de 4 a 10, como lista. El cliente
-                          también puede responder con el número de opción.
+                          En la API oficial, hasta 3 opciones se envían como botones; de 4 a 10,
+                          como lista. En conexiones QR se envían como texto numerado. El cliente
+                          puede responder con el número de opción.
                         </p>
                       </details>
                     )}

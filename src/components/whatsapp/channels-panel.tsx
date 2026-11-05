@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Link2, ShieldCheck, MessageCircle, Unplug, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { whatsappRequest } from './http';
+import { QrConnections } from './qr-connections';
 import type { Channels } from '@/modules/whatsapp/types';
 export function ChannelsPanel({ tenantId }: { tenantId: string }) {
   const [data, setData] = useState<Channels | null>(null);
@@ -44,12 +45,13 @@ export function ChannelsPanel({ tenantId }: { tenantId: string }) {
   }
   return (
     <div className="channels-panel">
+      <QrConnections key={tenantId} tenantId={tenantId} />
       <section className="channel-intro">
         <span className="icon-tile">
           <MessageCircle size={24} />
         </span>
         <div>
-          <h2>WhatsApp, conectado a tu equipo.</h2>
+          <h2>API oficial de Meta</h2>
           <p>
             Conectá un número autorizado con la API oficial de Meta para recibir conversaciones y
             responder desde MONZO.

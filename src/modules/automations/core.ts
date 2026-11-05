@@ -59,7 +59,11 @@ export async function mutateFlow(
     if (!flow) throw new FlowError(409, 'Guardá primero un borrador del flujo.');
     let published: FlowGraph | undefined;
     if (data.action !== 'pause') {
-      if (!account.enabled || !account.tokenEncrypted || account.lastErrorCode === 'META_190')
+      if (
+        !account.enabled ||
+        (account.provider === 'META' && !account.tokenEncrypted) ||
+        account.lastErrorCode === 'META_190'
+      )
         throw new FlowError(409, 'Autorizá el número en Canales antes de activar el flujo.');
       if (data.action === 'enable' && !flow.published)
         throw new FlowError(409, 'Publicá un borrador antes de activar el flujo.');
@@ -114,7 +118,11 @@ export async function controlConversation(
     const account = await tx.whatsappAccount.findFirst({
       where: { id: conversation.accountId, tenantId },
     });
-    if (!account?.enabled || !account.tokenEncrypted || account.lastErrorCode === 'META_190')
+    if (
+      !account?.enabled ||
+      (account.provider === 'META' && !account.tokenEncrypted) ||
+      account.lastErrorCode === 'META_190'
+    )
       throw new FlowError(409, 'Autorizá el canal en Canales antes de reanudar el flujo.');
     if (!flow?.enabled)
       throw new FlowError(409, 'Publicá y activá un flujo para este número antes de reanudar.');

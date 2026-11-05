@@ -27,9 +27,21 @@ export async function attachmentContext(
   });
   if (!member || !conversation)
     throw new AttachmentError(403, 'ACCESS', 'No tenés acceso a esta conversación.');
+  if (conversation.account.provider === 'BAILEYS')
+    throw new AttachmentError(
+      409,
+      'UNSUPPORTED_PROVIDER',
+      'Esta conexión QR todavía no admite adjuntos ni plantillas de Meta.',
+    );
   return conversation;
 }
 function assertSendable(conversation: Awaited<ReturnType<typeof attachmentContext>>) {
+  if (conversation.account.provider === 'BAILEYS')
+    throw new AttachmentError(
+      409,
+      'UNSUPPORTED_PROVIDER',
+      'Esta conexión QR admite texto; los adjuntos todavía no están disponibles.',
+    );
   if (
     !conversation.account.enabled ||
     !conversation.account.tokenEncrypted ||

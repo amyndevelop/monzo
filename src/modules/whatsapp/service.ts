@@ -29,7 +29,7 @@ export async function channelStatus(tenantId: string) {
   const pendingWhere = { OR: [{ jobPublishedAt: null }, { jobPublishedAt: { lt: stale } }] };
   const [accounts, heartbeat, failedEvents, pendingEvents, pendingMessages] = await Promise.all([
     getDb().whatsappAccount.findMany({
-      where: { tenantId },
+      where: { tenantId, provider: 'META' },
       select: { ...accountFields, tokenEncrypted: true },
       orderBy: { createdAt: 'asc' },
     }),
@@ -91,10 +91,12 @@ export async function connectAccount(tenantId: string, input: unknown) {
     .parse(input);
   const previous = await getDb().whatsappAccount.findUnique({
     where: { phoneNumberId: data.phoneNumberId },
-    select: { tenantId: true },
+    select: { tenantId: true, provider: true },
   });
   if (previous && previous.tenantId !== tenantId)
     throw new RequestError(409, 'Este número no está disponible para esta empresa.');
+  if (previous?.provider === 'BAILEYS')
+    throw new RequestError(409, 'Este identificador pertenece a una conexión QR.');
   let identity: { displayPhone: string; displayName: string };
   try {
     identity = await verifyAndSubscribe(
@@ -158,6 +160,8 @@ export async function disconnectAccount(tenantId: string, accountId: string) {
       where: { id: idSchema.parse(accountId), tenantId },
     });
     if (!account) throw new AccessError(403);
+    if (account.provider !== 'META')
+      throw new RequestError(409, 'Administrá esta sesión en la sección WhatsApp por QR.');
     await tx.whatsappAccount.update({
       where: { id: account.id },
       data: { enabled: false, tokenEncrypted: null },
@@ -283,7 +287,15 @@ async function scopedConversation(tenantId: string, conversationId: string) {
     where: { id: idSchema.parse(conversationId), tenantId },
     include: {
       contact: true,
-      account: { select: { id: true, enabled: true, displayPhone: true } },
+      account: {
+        select: {
+          id: true,
+          enabled: true,
+          displayPhone: true,
+          provider: true,
+          webSession: { select: { leaseUntil: true, state: true, desiredState: true } },
+        },
+      },
     },
   });
   if (!conversation) throw new AccessError(403);
@@ -363,17 +375,32 @@ export async function getThread(tenantId: string, conversationId: string, before
         name: conversation.contact.crmName ?? conversation.contact.name,
         waId: conversation.contact.waId,
       },
-      account: conversation.account,
+      account: {
+        id: conversation.account.id,
+        enabled: conversation.account.enabled,
+        displayPhone: conversation.account.displayPhone,
+        provider: conversation.account.provider,
+      },
       unreadCount: conversation.unreadCount,
     },
     messages: messages.slice(0, 50).reverse().map(presentMessage),
     hasMore: messages.length > 50,
     notes,
     members,
-    replyWindowClosesAt: conversation.lastInboundAt
-      ? new Date(conversation.lastInboundAt.getTime() + 86400000)
-      : null,
-    canReply: conversation.account.enabled && withinWindow(conversation.lastInboundAt),
+    replyWindowClosesAt:
+      conversation.account.provider === 'META' && conversation.lastInboundAt
+        ? new Date(conversation.lastInboundAt.getTime() + 86400000)
+        : null,
+    canReply:
+      conversation.account.enabled &&
+      (conversation.account.provider === 'BAILEYS'
+        ? Boolean(
+            conversation.account.webSession?.state === 'CONNECTED' &&
+            conversation.account.webSession.desiredState === 'CONNECTED' &&
+            conversation.account.webSession.leaseUntil &&
+            conversation.account.webSession.leaseUntil.getTime() > Date.now(),
+          )
+        : withinWindow(conversation.lastInboundAt)),
   };
 }
 export async function enqueueMessage(tenantId: string, conversationId: string, input: unknown) {
@@ -405,12 +432,20 @@ export async function enqueueMessage(tenantId: string, conversationId: string, i
     }
     const conversation = await tx.conversation.findFirst({
       where: { id: conversationId, tenantId },
-      include: { account: true },
+      include: { account: { include: { webSession: true } } },
     });
     if (!conversation) throw new AccessError(403);
-    if (!conversation.account.enabled || !conversation.account.tokenEncrypted)
+    if (
+      !conversation.account.enabled ||
+      (conversation.account.provider === 'META' && !conversation.account.tokenEncrypted) ||
+      (conversation.account.provider === 'BAILEYS' &&
+        (!conversation.account.webSession?.leaseUntil ||
+          conversation.account.webSession.leaseUntil.getTime() <= Date.now() ||
+          conversation.account.webSession.state !== 'CONNECTED' ||
+          conversation.account.webSession.desiredState !== 'CONNECTED'))
+    )
       throw new RequestError(409, 'El canal no está habilitado para enviar.');
-    if (!withinWindow(conversation.lastInboundAt))
+    if (conversation.account.provider === 'META' && !withinWindow(conversation.lastInboundAt))
       throw new RequestError(
         409,
         'La ventana de atención de 24 horas está cerrada. Esperá un nuevo mensaje del cliente; las plantillas se incorporarán más adelante.',
@@ -570,6 +605,13 @@ export async function listContacts(tenantId: string, query: string) {
 export async function checkAccountAuthorization(tenantId: string, accountId: string) {
   await requireTenantAccess(idSchema.parse(tenantId), ['OWNER']);
   idSchema.parse(accountId);
+  const account = await getDb().whatsappAccount.findFirst({
+    where: { id: accountId, tenantId },
+    select: { provider: true },
+  });
+  if (!account) throw new AccessError(403);
+  if (account.provider !== 'META')
+    throw new RequestError(409, 'Esta comprobación corresponde a la API oficial de Meta.');
   const { checkSavedAuthorization } = await import('./core/authorization');
   const { consumeLimit } = await import('./core/attachments');
   const { AttachmentError } = await import('./core/media');

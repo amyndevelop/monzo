@@ -122,6 +122,7 @@ export async function dispatchJobs(db: PrismaClient, jobs: WhatsappJob[], transp
       where: {
         id: { in: jobs.filter((j) => j.kind === 'inbox').map((j) => j.id) },
         state: 'PENDING',
+        account: { provider: 'META' },
         OR: [{ jobPublishedAt: null }, { jobPublishedAt: { lt: stale } }],
       },
       select: { id: true },
@@ -131,6 +132,7 @@ export async function dispatchJobs(db: PrismaClient, jobs: WhatsappJob[], transp
         id: { in: jobs.filter((j) => j.kind === 'outbox').map((j) => j.id) },
         status: 'QUEUED',
         direction: 'OUTBOUND',
+        account: { provider: 'META' },
         OR: [{ jobPublishedAt: null }, { jobPublishedAt: { lt: stale } }],
       },
       select: { id: true },

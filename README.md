@@ -85,3 +85,7 @@ Las páginas de acceso informan que el servicio aún no está habilitado si la c
 - `public/brand/`, `assets/brand/originals/`: recursos oficiales y originales preservados.
 
 El logo proviene del PDF vectorial original, sin redibujar ni recolorear; las 20 reacciones de la mascota conservan transparencias. Ver [branding](docs/branding.md).
+
+## WhatsApp por QR (Baileys)
+
+Conector opcional no oficial con servicio persistente para VPS Ubuntu/Docker. Primera entrega de texto individual y árboles numerados; no importa historial previo ni grupos y no ofrece adjuntos/plantillas Meta. Requiere la migración combinada y el despliegue del servicio antes de vincular un teléfono real. La interfaz sigue en Vercel. Instrucciones y límites en [docs/whatsapp-qr-deploy.md](docs/whatsapp-qr-deploy.md).

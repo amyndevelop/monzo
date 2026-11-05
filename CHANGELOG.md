@@ -1,5 +1,11 @@
 # Cambios de MONZO
 
+## 0.4.0 · WhatsApp por QR con Baileys
+
+Conector opcional desde Canales y servicio Docker persistente para Ubuntu/VPS. Sesión y QR cifrados, permisos por empresa, estado real y recuperación tras reinicio. Recepción/envío de texto y árboles con opciones numeradas; contactos, notas y analíticas comparten la bandeja existente. Las conexiones QR no ofrecen plantillas ni adjuntos de Meta. No importan historial previo ni grupos.
+
+Requiere la undécima migración y el servicio instalado en el VPS. El SQL combinado incluye la migración pendiente de Contactos. Conexión no oficial; puede desconectarse o sufrir restricciones de WhatsApp. Ver docs/whatsapp-qr-deploy.md. La publicación y la prueba real de vinculación están pendientes.
+
 ## 0.3.0 · Contactos y seguimiento comercial
 
 Ficha accesible desde Contactos y desde el chat, con nombre comercial, correo, empresa, etiquetas, responsable y estado comercial. Lista con búsqueda y filtros. Incorporación revisada de respuestas de flujos a los campos de la ficha. Control de revisiones, conservación del borrador y recuperación de errores. El seguimiento comercial es independiente del operador del chat y de las automatizaciones.

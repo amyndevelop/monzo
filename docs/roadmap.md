@@ -46,6 +46,10 @@ Implementación solicitada por documento del usuario: catálogo tipado por empre
 
 Alcance autorizado: fichas, etiquetas, responsables, estados comerciales y uso revisado de respuestas de flujos. Acceso desde la lista y el chat, búsqueda/filtros, control de revisiones y borradores preservados. Versión 0.3.0; requiere la décima migración antes de publicar. Ver docs/phase-11.md.
 
+## WhatsApp por QR · 0.4.0 — implementado; Neon y VPS pendientes
+
+Alternativa elegida por el usuario para usar WhatsApp como dispositivo vinculado mediante Baileys en Ubuntu/Docker. Texto y árboles numerados, con estado y sesión cifrada. No incluye historial previo, grupos, adjuntos ni plantillas Meta. Requiere migración y VPS operativo; la conexión real todavía no fue verificada. Ver docs/whatsapp-qr-deploy.md.
+
 ## Fases posteriores · Por definir y autorizar
 
 1. Completar agentes IA: asistencia con datos reales según tratamiento contratado, automatización y escalamiento.
