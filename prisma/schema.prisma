@@ -24,6 +24,7 @@ model User {
   image                 String?
   sessions              Session[]
   accounts              Account[]
+  ownedContacts         Contact[]          @relation("ContactOwner")
   assignedConversations Conversation[]     @relation("AssignedAgent")
   sentMessages          Message[]          @relation("MessageAuthor")
   conversationNotes     ConversationNote[]
@@ -202,9 +203,20 @@ model Contact {
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
   conversations Conversation[]
+  crmName       String?
+  email         String?
+  company       String?
+  salesStage    String          @default("NEW")
+  tags          String[]        @default([])
+  ownerUserId   String?
+  owner         User?           @relation("ContactOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  profileNotes  String?
+  crmRevision   Int             @default(1)
 
   @@unique([tenantId, accountId, waId])
   @@unique([id, accountId, tenantId])
+  @@index([tenantId, salesStage, updatedAt])
+  @@index([ownerUserId])
   @@index([tenantId, name])
 }
 

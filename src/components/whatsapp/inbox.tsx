@@ -16,6 +16,7 @@ import {
   FileText,
   LoaderCircle,
 } from 'lucide-react';
+import { ContactDrawer } from '@/components/contacts/contact-drawer';
 import { ConversationFlowControl } from '@/components/automations/conversation-control';
 import { Button } from '@/components/ui/button';
 import { whatsappRequest } from './http';
@@ -82,6 +83,7 @@ export function Inbox({
   const base = `/api/workspaces/${tenantId}`;
   const [items, setItems] = useState<ChatSummary[]>([]);
   const [selected, setSelected] = useState<string | null>(initialConversation ?? null);
+  const [contactOpen, setContactOpen] = useState(false);
   const [thread, setThread] = useState<ChatThread | null>(null);
   const [channel, setChannel] = useState<Channels | null>(null);
   const [query, setQuery] = useState('');
@@ -125,6 +127,7 @@ export function Inbox({
     setSelected(id);
     setTemplateOpen(false);
     setThread(null);
+    setContactOpen(false);
     setDraft('');
     clearAttachment();
     nonce.current = null;
@@ -387,6 +390,9 @@ export function Inbox({
               onChange={refreshThread}
             />
             <div className="thread-tools">
+              <Button type="button" variant="outline" onClick={() => setContactOpen(true)}>
+                Ficha del contacto
+              </Button>
               <label>
                 <UserRound size={14} />
                 <span className="sr-only">Operador asignado</span>
@@ -771,6 +777,19 @@ export function Inbox({
               )}
             </form>
           </>
+        )}
+        {contactOpen && thread && (
+          <ContactDrawer
+            key={thread.conversation.contact.id}
+            tenantId={tenantId}
+            contactId={thread.conversation.contact.id}
+            onClose={() => setContactOpen(false)}
+            onSaved={() => {
+              void refreshThread().catch(() =>
+                setError('Ficha guardada. Actualizá el chat para ver los cambios.'),
+              );
+            }}
+          />
         )}
         {templateOpen && selected && thread && (
           <TemplateDialog

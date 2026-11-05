@@ -42,6 +42,10 @@ El usuario eligió analíticas de conversaciones, mensajes y resultados de flujo
 
 Implementación solicitada por documento del usuario: catálogo tipado por empresa, captura y selección, múltiples asignaciones, inserción al cursor, condiciones tipadas, confirmación/corrección y ejecución compartida con el simulador. Versión 0.2.0. MVP de valores por ejecución; contacto/conversación son alcances futuros. Novena migración validada localmente y confirmada por el usuario en Neon con neondb | 1 | 12 | 9. Integrada mediante PR #8. Ajuste UX 0.2.1 del constructor documentado en docs/automation-workspace-ux.md. Ver docs/phase-10.md.
 
+## Fase 11 · Contactos y seguimiento comercial — implementada; Neon pendiente
+
+Alcance autorizado: fichas, etiquetas, responsables, estados comerciales y uso revisado de respuestas de flujos. Acceso desde la lista y el chat, búsqueda/filtros, control de revisiones y borradores preservados. Versión 0.3.0; requiere la décima migración antes de publicar. Ver docs/phase-11.md.
+
 ## Fases posteriores · Por definir y autorizar
 
 1. Completar agentes IA: asistencia con datos reales según tratamiento contratado, automatización y escalamiento.

@@ -239,6 +239,7 @@ export async function listConversations(tenantId: string, params: URLSearchParam
             contact: {
               OR: [
                 { name: { contains: query, mode: 'insensitive' as const } },
+                { crmName: { contains: query, mode: 'insensitive' as const } },
                 { waId: { contains: query } },
               ],
             },
@@ -252,7 +253,7 @@ export async function listConversations(tenantId: string, params: URLSearchParam
       lastMessageAt: true,
       lastInboundAt: true,
       assignedUserId: true,
-      contact: { select: { id: true, name: true, waId: true } },
+      contact: { select: { id: true, name: true, crmName: true, waId: true } },
       account: { select: { id: true, displayPhone: true, enabled: true } },
       messages: {
         select: messageFields,
@@ -264,9 +265,15 @@ export async function listConversations(tenantId: string, params: URLSearchParam
     take: 101,
   });
   return {
-    items: items
-      .slice(0, 100)
-      .map((item) => ({ ...item, messages: item.messages.map(presentMessage) })),
+    items: items.slice(0, 100).map((item) => ({
+      ...item,
+      contact: {
+        id: item.contact.id,
+        name: item.contact.crmName ?? item.contact.name,
+        waId: item.contact.waId,
+      },
+      messages: item.messages.map(presentMessage),
+    })),
     hasMore: items.length > 100,
   };
 }
@@ -353,7 +360,7 @@ export async function getThread(tenantId: string, conversationId: string, before
       assignedUserId: conversation.assignedUserId,
       contact: {
         id: conversation.contact.id,
-        name: conversation.contact.name,
+        name: conversation.contact.crmName ?? conversation.contact.name,
         waId: conversation.contact.waId,
       },
       account: conversation.account,

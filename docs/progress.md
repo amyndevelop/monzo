@@ -384,3 +384,11 @@ El usuario confirmó la novena migración en Neon con **neondb | 1 | 12 | 9**. S
 ## Constructor de automatizaciones · UX 0.2.1
 
 Variables dinámicas se integró mediante PR #8 (76c4a494de793129ce2d23a1476d3dedbf1e7858), con ambos despliegues confirmados. A partir de las capturas del usuario se compactó el constructor: acciones persistentes, árbol/editor con scroll independiente, búsqueda, panel de variables y navegación móvil entre árbol y edición. 200/200 pruebas generales aprobadas, sin fallos ni omisiones. Capturas revisadas en escritorio 1366 × 640 y móvil; compilación webpack, tipos y lint aprobados. Sin migraciones nuevas. Detalles en docs/automation-workspace-ux.md.
+
+## Fase 11 · Contactos y seguimiento comercial · 0.3.0
+
+El usuario autorizó continuar con contactos y seguimiento comercial, dejando IA para más adelante. Se implementó la ficha compartida entre Contactos y chat, nombre comercial conservado ante cambios del perfil WhatsApp, correo, empresa, estados, etiquetas, responsable comercial y observaciones. Filtros combinables y copia revisada de respuestas del flujo a campos de ficha. No se activa IA ni se modifica el estado/operador del chat al editar el seguimiento.
+
+Diez pruebas nuevas aprobadas en escritorio y móvil: persistencia, filtros, aislamiento, origen, roles/revocación, concurrencia, incorporación de respuestas, recuperación del formulario, Escape/foco y compositor visible. Compilación webpack, tipos, lint, formato y Prisma aprobados; esquema local sin diferencias. La suite general terminó con 209/210 aprobadas; el único fallo ocurrió durante el alta del usuario de una prueba previa (transacción local de 5 s vencida a los 6,7 s), antes de sus aserciones de aislamiento. Repetición aislada del mismo caso aprobada sin cambios de código. Las diez pruebas nuevas aprobaron también dentro de la suite general.
+
+Décima migración aplicada solo en monzo_dev/monzo_test. SQL atómico para neondb preparado y validado en base temporal local: rollback forzado, checksums del historial, valores iniciales, datos conservados y repetición que respeta fichas editadas. Falta confirmación del resultado **neondb | 8 | 10** en Neon antes de integrar a producción. No se accedió a credenciales ni datos de Neon. Guía en docs/phase-11.md.

@@ -1,5 +1,11 @@
 # Cambios de MONZO
 
+## 0.3.0 · Contactos y seguimiento comercial
+
+Ficha accesible desde Contactos y desde el chat, con nombre comercial, correo, empresa, etiquetas, responsable y estado comercial. Lista con búsqueda y filtros. Incorporación revisada de respuestas de flujos a los campos de la ficha. Control de revisiones, conservación del borrador y recuperación de errores. El seguimiento comercial es independiente del operador del chat y de las automatizaciones.
+
+Requiere la décima migración, 202611020001_contact_follow_up, antes de publicar. Ver docs/phase-11.md.
+
 ## 0.2.1 · Constructor de automatizaciones compacto
 
 Árbol y editor en paneles con desplazamiento independiente, acciones siempre visibles, búsqueda de pasos y catálogo de variables lateral. En móvil se alterna entre árbol y edición. Ejemplos, ayuda y opciones avanzadas se despliegan a pedido. Se conservan borradores, validación y publicación existentes. Sin migraciones nuevas.
