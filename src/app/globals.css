@@ -6391,3 +6391,133 @@ svg {
     flex-direction: column;
   }
 }
+
+.evolution-connection {
+  padding: 26px;
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 18px;
+  margin-bottom: 24px;
+}
+.evolution-heading {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.evolution-heading > div {
+  flex: 1;
+  min-width: 160px;
+}
+.evolution-heading h2 {
+  margin: 0;
+  font-size: 21px;
+  letter-spacing: -0.6px;
+}
+.evolution-heading p,
+.evolution-description,
+.evolution-help {
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.evolution-heading p {
+  margin: 4px 0 0;
+}
+.evolution-description {
+  margin: 20px 0 12px;
+}
+.evolution-help {
+  margin: 10px 0;
+}
+.evolution-badge {
+  padding: 6px 10px;
+  background: #f1f6f7;
+  color: #59717c;
+  border-radius: 8px;
+  font-size: 11px;
+}
+.evolution-ready {
+  background: #e5f5ee;
+  color: #287454;
+}
+.evolution-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 16px;
+}
+.evolution-actions small {
+  color: var(--muted-foreground);
+  font-size: 11px;
+  line-height: 1.6;
+}
+.evolution-report {
+  margin-top: 20px;
+  padding: 16px;
+  background: #f5faf9;
+  border: 1px solid #dcece8;
+  border-radius: 12px;
+}
+.evolution-report ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 15px;
+}
+.evolution-report li {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+.evolution-report li svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.evolution-report li span {
+  display: grid;
+  gap: 4px;
+}
+.evolution-report strong {
+  font-size: 12px;
+  font-weight: 600;
+}
+.evolution-report small {
+  font-size: 11px;
+  color: #627b7b;
+  line-height: 1.7;
+}
+.evolution-report .check-ok {
+  color: #26745c;
+}
+.evolution-report .check-pending {
+  color: #946829;
+}
+.evolution-report > p {
+  margin: 16px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid #dfebe7;
+  font-size: 10px;
+  color: #728783;
+  line-height: 1.6;
+}
+.evolution-error {
+  margin-top: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+@media (max-width: 600px) {
+  .evolution-connection {
+    padding: 20px 16px;
+  }
+  .evolution-heading h2 {
+    font-size: 19px;
+  }
+  .evolution-badge {
+    margin-left: 54px;
+  }
+}

@@ -58,3 +58,7 @@ Alternativa elegida por el usuario para usar WhatsApp como dispositivo vinculado
 4. Analíticas verificables, CRM comercial, suscripciones y facturación.
 
 No son fechas de entrega ni funciones disponibles. No se inicia otra fase automáticamente.
+
+## Ampliación BOOSTIFY · Plan nuevo en ocho etapas
+
+La auditoría conserva las funciones existentes y distingue el plan nuevo de las fases históricas anteriores. La Etapa 2 prepara Evolution en `feat/evolution-integration`, usando el dominio raíz `onlineboosty.com.ar`, con despliegue pendiente de aprobación. [Alcance, pruebas, instalación y límites](evolution-stage-2.md). El QR y mensajes mediante Evolution corresponden a la Etapa 3; pedidos, pagos y finanzas se mantienen para las etapas siguientes.

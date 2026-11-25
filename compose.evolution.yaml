@@ -1,0 +1,142 @@
+name: monzo-evolution
+services:
+  evolution-db:
+    image: postgres:17-alpine@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: evolution
+      POSTGRES_DB: evolution
+      POSTGRES_PASSWORD: ${EVOLUTION_DB_PASSWORD:?Run the Evolution setup script first}
+    volumes: [evolution_database:/var/lib/postgresql/data]
+    networks: [backplane]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 512m
+    pids_limit: 256
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U evolution -d evolution]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+  evolution-redis:
+    image: redis:7-alpine@sha256:8da19c7399dca900c6822a1cf30f9d2285585e2c4b457ff4095b0f4500054d3f
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${EVOLUTION_REDIS_PASSWORD:?Run the Evolution setup script first}
+    command:
+      - sh
+      - -c
+      - "umask 077; printf 'appendonly yes\nmaxmemory 96mb\nmaxmemory-policy noeviction\nrequirepass %s\n' \"$$REDIS_PASSWORD\" > /tmp/redis.conf; exec redis-server /tmp/redis.conf"
+    volumes: [evolution_cache:/data]
+    tmpfs: ['/tmp:size=32m,mode=1777']
+    networks: [backplane]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 192m
+    pids_limit: 64
+    healthcheck:
+      test: [CMD-SHELL, 'REDISCLI_AUTH="$$REDIS_PASSWORD" redis-cli ping | grep -q PONG']
+      interval: 5s
+      timeout: 3s
+      retries: 30
+  evolution:
+    image: monzo-evolution-api:2.3.8
+    build:
+      context: deploy/evolution
+      dockerfile: Dockerfile.evolution
+    restart: unless-stopped
+    init: true
+    depends_on:
+      evolution-db: { condition: service_healthy }
+      evolution-redis: { condition: service_healthy }
+    environment:
+      SERVER_NAME: evolution
+      SERVER_DISABLE_MANAGER: 'true'
+      SERVER_TYPE: http
+      SERVER_PORT: 8080
+      SERVER_URL: http://evolution:8080
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY:?Run the Evolution setup script first}
+      AUTHENTICATION_EXPOSE_IN_FETCH_INSTANCES: 'false'
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: postgresql://evolution:${EVOLUTION_DB_PASSWORD}@evolution-db:5432/evolution
+      DATABASE_SAVE_DATA_INSTANCE: 'true'
+      DATABASE_SAVE_DATA_NEW_MESSAGE: 'true'
+      DATABASE_SAVE_MESSAGE_UPDATE: 'true'
+      DATABASE_SAVE_DATA_CONTACTS: 'true'
+      DATABASE_SAVE_DATA_CHATS: 'true'
+      DATABASE_SAVE_DATA_LABELS: 'false'
+      DATABASE_SAVE_DATA_HISTORIC: 'false'
+      CACHE_REDIS_ENABLED: 'true'
+      CACHE_REDIS_URI: redis://:${EVOLUTION_REDIS_PASSWORD}@evolution-redis:6379/0
+      CACHE_REDIS_PREFIX_KEY: monzo-evolution
+      CACHE_REDIS_SAVE_INSTANCES: 'false'
+      TELEMETRY_ENABLED: 'false'
+      WEBHOOK_GLOBAL_ENABLED: 'false'
+      WEBHOOK_EVENTS_ERRORS: 'false'
+      LOG_LEVEL: ERROR,WARN
+      LOG_BAILEYS: silent
+      LOG_QRCODE: 'false'
+      QRCODE_LIMIT: 10
+      CORS_ORIGIN: ${MONZO_ORIGIN:?Run the Evolution setup script first}
+      CORS_CREDENTIALS: 'false'
+      CHATWOOT_ENABLED: 'false'
+      RABBITMQ_ENABLED: 'false'
+      SQS_ENABLED: 'false'
+      KAFKA_ENABLED: 'false'
+      WEBSOCKET_ENABLED: 'false'
+      NODE_OPTIONS: --max-old-space-size=1024
+    volumes: [evolution_instances:/evolution/instances]
+    tmpfs: ['/tmp:size=192m,mode=1777']
+    networks: [backplane, egress]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    # This release has direct message console.log calls outside LOG_LEVEL.
+    # Provider stdout is neither stored nor forwarded; use the bounded gateway diagnostics.
+    logging: { driver: none }
+    mem_limit: 1536m
+    pids_limit: 256
+    stop_grace_period: 40s
+    healthcheck:
+      test:
+        [
+          CMD,
+          node,
+          -e,
+          "fetch('http://127.0.0.1:8080/', {headers:{origin:process.env.CORS_ORIGIN}}).then(r=>r.json()).then(d=>process.exit(d.version==='2.3.8'?0:1)).catch(()=>process.exit(1))",
+        ]
+      start_period: 180s
+      interval: 15s
+      timeout: 5s
+      retries: 10
+  evolution-gateway:
+    image: monzo-evolution-gateway:0.1.0
+    build: { context: services/evolution-gateway }
+    restart: unless-stopped
+    init: true
+    depends_on:
+      evolution: { condition: service_healthy }
+    environment:
+      NODE_ENV: production
+      EVOLUTION_ORIGIN: http://evolution:8080
+      EVOLUTION_API_KEY: ${EVOLUTION_API_KEY}
+      EVOLUTION_GATEWAY_KEY: ${EVOLUTION_GATEWAY_KEY:?Run the Evolution setup script first}
+      EVOLUTION_WEBHOOK_SECRET: ${EVOLUTION_WEBHOOK_SECRET:?Run the Evolution setup script first}
+      MONZO_CALLBACK_URL: ${MONZO_ORIGIN}/api/integrations/evolution/probe
+      NODE_USE_ENV_PROXY: '1'
+      NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1},evolution,evolution-db,evolution-redis
+      no_proxy: ${NO_PROXY:-localhost,127.0.0.1},evolution,evolution-db,evolution-redis
+    ports: ['127.0.0.1:${EVOLUTION_GATEWAY_PORT:-18085}:9080']
+    networks: [backplane, egress]
+    read_only: true
+    tmpfs: ['/tmp:size=32m,mode=1777']
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    logging: { driver: json-file, options: { max-size: 5m, max-file: '2' } }
+    mem_limit: 128m
+    pids_limit: 64
+    stop_grace_period: 15s
+networks:
+  backplane: { internal: true }
+  egress: {}
+volumes:
+  evolution_database: {}
+  evolution_cache: {}
+  evolution_instances: {}

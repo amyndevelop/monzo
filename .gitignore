@@ -4,6 +4,8 @@ out/
 .env*
 !.env.example
 !.env.qr.example
+!.env.evolution.example
+.evolution/
 *.tsbuildinfo
 playwright-report/
 test-results/

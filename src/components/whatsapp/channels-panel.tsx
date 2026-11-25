@@ -4,6 +4,7 @@ import { Link2, ShieldCheck, MessageCircle, Unplug, RefreshCw } from 'lucide-rea
 import { Button } from '@/components/ui/button';
 import { whatsappRequest } from './http';
 import { QrConnections } from './qr-connections';
+import { EvolutionConnection } from './evolution-connection';
 import type { Channels } from '@/modules/whatsapp/types';
 export function ChannelsPanel({ tenantId }: { tenantId: string }) {
   const [data, setData] = useState<Channels | null>(null);
@@ -45,6 +46,7 @@ export function ChannelsPanel({ tenantId }: { tenantId: string }) {
   }
   return (
     <div className="channels-panel">
+      <EvolutionConnection key={`evolution-${tenantId}`} tenantId={tenantId} />
       <QrConnections key={tenantId} tenantId={tenantId} />
       <section className="channel-intro">
         <span className="icon-tile">

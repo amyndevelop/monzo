@@ -71,6 +71,8 @@ for (const key of [
   'WHATSAPP_ENCRYPTION_KEY',
   'WHATSAPP_APP_SECRET',
   'WHATSAPP_WEBHOOK_VERIFY_TOKEN',
+  'EVOLUTION_WEBHOOK_SECRET',
+  'EVOLUTION_GATEWAY_KEY',
 ])
   if (!existingTest[key]) missingTest[key] = generate();
 if (!existingTest.REDIS_URL)
