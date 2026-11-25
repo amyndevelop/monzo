@@ -327,3 +327,69 @@ test('comprobación del preview: verifica HTTP 405 sin mostrar claves ni seguir 
   assert.equal(JSON.stringify(redirected).includes(secret), false);
   assert.equal(JSON.stringify(redirected).includes('private='), false);
 });
+test('conexión completa del operador: HTTPS de producción e ida/vuelta local sin exponer claves', async (t) => {
+  const { checkGatewayConnection, gatewayOrigin } =
+    await import('../../../scripts/check-evolution-connection.mjs');
+  assert.equal(gatewayOrigin('onlineboosty.com.ar'), 'https://onlineboosty.com.ar');
+  for (const value of [
+    'localhost',
+    '169.254.169.254',
+    'user:secret@example.test',
+    'example.test/path',
+    'example.test?token=private',
+  ])
+    assert.throws(() => gatewayOrigin(value));
+  const r = await rig(t, { vercelProtection: true, vercelKey: 'correct' });
+  const result = await checkGatewayConnection(r.config, r.gateway);
+  assert.deepEqual(result, { ok: true, evolutionCode: 'OK', callbackCode: 'OK' });
+  for (const value of [
+    r.config.apiKey,
+    r.config.gatewayKey,
+    r.config.webhookSecret,
+    r.config.vercelBypassSecret,
+  ])
+    assert.equal(JSON.stringify(result).includes(value), false);
+});
+test('comprobación del operador: firma no comprobada sigue siendo un fallo', async (t) => {
+  const { checkGatewayConnection } =
+    await import('../../../scripts/check-evolution-connection.mjs');
+  const r = await rig(t, { proof: false });
+  const result = await checkGatewayConnection(r.config, r.gateway);
+  assert.deepEqual(result, { ok: false, evolutionCode: 'OK', callbackCode: 'CALLBACK_RESPONSE' });
+});
+test('comprobación del operador: credencial solo al gateway, redirecciones rechazadas y desafío validado', async () => {
+  const { checkGatewayConnection } =
+    await import('../../../scripts/check-evolution-connection.mjs');
+  const config = { gatewayKey: key(), callbackUrl: 'https://preview.vercel.app' + PROBE_PATH };
+  await assert.rejects(
+    checkGatewayConnection(config, 'https://onlineboosty.com.ar', async (url, init) => {
+      assert.equal(url, 'https://onlineboosty.com.ar/v1/diagnostics');
+      assert.equal(init.redirect, 'error');
+      assert.deepEqual(Object.keys(init.headers).sort(), ['authorization', 'content-type']);
+      const input = JSON.parse(init.body);
+      return Response.json({
+        protocol: PROTOCOL,
+        challenge: key(),
+        checkedAt: new Date().toISOString(),
+        evolution: { ok: true, code: 'OK', version: '2.3.8' },
+        callback: { ok: true, code: 'OK' },
+        private_data: input.challenge,
+      });
+    }),
+    /INVALID_RESPONSE/,
+  );
+  await assert.rejects(
+    checkGatewayConnection(
+      config,
+      'https://onlineboosty.com.ar',
+      async () => new Response('{}', { status: 401 }),
+    ),
+    /GATEWAY_AUTH/,
+  );
+  await assert.rejects(
+    checkGatewayConnection(config, 'https://onlineboosty.com.ar', async () => {
+      throw new Error('redirect blocked with private details');
+    }),
+    /UNREACHABLE/,
+  );
+});

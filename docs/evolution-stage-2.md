@@ -190,7 +190,7 @@ El aviso `IPv4 forwarding is disabled` es independiente del guardado: setup y se
 
 ## Comprobación y publicación HTTPS del sitio identificado
 
-El usuario confirmó en el VPS el motor rootless Docker 29.1.3 con cgroups 2/systemd, los cuatro servicios Evolution/Redis/PostgreSQL/gateway en Healthy, persistencia mediante unidad de usuario y linger, y `http://127.0.0.1:18085/healthz` devolviendo `{"ok":true,"protocol":"monzo-evolution-v1"}`. El forwarding global del VPS continúa en 0. El sitio público todavía no se reemplazó.
+El usuario confirmó en el VPS el motor rootless Docker 29.1.3 con cgroups 2/systemd, los cuatro servicios Evolution/Redis/PostgreSQL/gateway en Healthy, persistencia mediante unidad de usuario y linger, y `http://127.0.0.1:18085/healthz` devolviendo `{"ok":true,"protocol":"monzo-evolution-v1"}`. El forwarding global del VPS continúa en 0. La publicación HTTPS posterior quedó confirmada con la salida del VPS descrita al final de esta guía.
 
 La propuesta pública y revisable está en `deploy/evolution/nginx-onlineboosty.conf`. Las pruebas comprueban que coincide con la plantilla generada por setup para el dominio y puerto de este VPS. Solo publica POST `/v1/diagnostics` hacia el gateway local; la raíz del dominio responde 404. MONZO continúa en su dirección de Vercel.
 
@@ -223,3 +223,28 @@ El usuario autorizó aplicar la publicación. El primer intento pasó las valida
 El verificador se ajusta para tolerar el relevo de procesos tras una recarga: reintenta durante una ventana de hasta 15 segundos, con conexiones de tiempo limitado. Conecta directamente a 127.0.0.1:443 y mantiene SNI/Host para `onlineboosty.com.ar`, verificación de nombre/cadena TLS y rechazo sin credenciales. Exige tanto HTTP 401 como el cuerpo JSON acotado `{"error":"UNAUTHORIZED"}` del gateway; un 401 de otra página de autenticación no demuestra acceso al gateway y se rechaza. No sigue redirecciones ni imprime cuerpos de respuesta.
 
 Si sigue fallando, conserva en el mensaje de recuperación la etapa, el HTTP recibido o un diagnóstico fijo de certificado/conexión. No imprime comandos con datos sensibles ni excepciones arbitrarias. Las pruebas cubren la transición 404→401 tras recarga, desconexiones recuperables, límite de reintentos, certificados no confiables, 401 de otro servicio y recuperación con diagnóstico. Una prueba HTTPS local verifica SNI/Host, ruta, ausencia de Authorization, marcador JSON y rechazo de un certificado no confiable. La ventana de espera corrige una posible carrera de recarga; no se declara confirmada la causa exacta del primer intento hasta observar el nuevo resultado del VPS.
+
+### Publicación confirmada y comprobación del retorno firmado
+
+El usuario ejecutó `--apply` después de actualizar a `fd3c550`. El VPS informó **HTTPS aplicado y rechazo sin credencial HTTP 401 comprobado**, con respaldo privado en `/var/backups/monzo-evolution-nginx/cambio-rv3ck02v`. Esto comprueba TLS y el acceso al gateway a través del Nginx local; todavía falta verificar la conexión autenticada y el retorno HMAC a MONZO. El acceso del VPS al Preview protegido ya había devuelto el HTTP 405 esperado usando su clave de automatizaciones.
+
+En Vercel, proyecto **monzo-v → Settings → Environment Variables**, cargar las tres variables siguientes seleccionando **solo Preview**, específicamente la rama **feat/evolution-integration**. Sus valores están conservados en el VPS en `.evolution/vercel.env`; abrirlos únicamente en la terminal privada con `less .evolution/vercel.env` y salir con `q`. Para pegarlos manualmente en Vercel, copiar el valor sin las comillas que lo rodean. No compartir el archivo ni capturas de sus valores.
+
+- `EVOLUTION_GATEWAY_URL`: `https://onlineboosty.com.ar`.
+- `EVOLUTION_GATEWAY_KEY`: su valor del archivo privado.
+- `EVOLUTION_WEBHOOK_SECRET`: su valor del archivo privado.
+
+Crear un nuevo despliegue Preview de esa rama después de guardar las variables y esperar Ready. No seleccionar Production ni reutilizar como destino el dominio de producción de MONZO. Esta comprobación no requiere iniciar sesión ni escribir en la base de MONZO: no reemplaza la preparación posterior de una base aislada y el origen de autenticación del Preview antes de probar operaciones desde la interfaz.
+
+Actualizar el checkout del VPS con `git pull --ff-only`. Desde `~/monzo-evolution`, usar el motor rootless dedicado, **sin sudo**:
+
+```bash
+./scripts/evolution-docker.sh run --rm --read-only --user 0:0 \
+  --mount "type=bind,src=$PWD,dst=/workspace,readonly" --workdir /workspace \
+  node:24-bookworm-slim@sha256:873f586f3794f52281bd039bf02c048a0be08fde619338f9941bad1eb6b34530 \
+  node scripts/check-evolution-connection.mjs
+```
+
+El usuario 0 del contenedor rootless corresponde al usuario adminuh del host y puede leer el archivo 0600. El comando envía únicamente la credencial del gateway a su dirección HTTPS, sin seguir redirecciones. El gateway consulta Evolution y realiza el desafío HMAC al destino fijo de MONZO, con la cabecera privada de automatizaciones de Vercel cuando corresponde. El script valida el protocolo, desafío, fecha, versión y códigos de respuesta; solo imprime estados permitidos. Una respuesta de éxito exige `Evolution y credencial interna: OK` y `Retorno HMAC a MONZO: OK`. No imprime claves ni cuerpos del proveedor, no crea instancias, no envía mensajes y no modifica la base de MONZO.
+
+Las 21 pruebas locales de gateway/setup incluyen el diagnóstico con ida y vuelta HTTP controlada, prueba HMAC incorrecta, credencial limitada al gateway, redirecciones bloqueadas y desafío incorrecto. No equivalen a la comprobación pendiente desde el VPS contra el Preview real ni a una vinculación de teléfono.
