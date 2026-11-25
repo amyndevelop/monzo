@@ -128,3 +128,52 @@ La dirección que se debe cargar como `MONZO_ORIGIN` es la del sitio Preview que
 El check de Vercel del commit `7dcd3ab` publica el dominio de rama **https://monzo-v-git-feat-evolution-integration-arqen2.vercel.app**. Usar ese origen para `MONZO_ORIGIN` del VPS y para `BETTER_AUTH_URL` del entorno Preview específico de esta rama, junto con su base de pruebas y secretos independientes. La URL con hash que se abre desde Visit identifica un despliegue puntual y no es el origen operativo para esta conexión. No cambiar la configuración Production.
 
 La dirección fue identificada desde el check público de GitHub. El entorno de desarrollo bloquea sus solicitudes HTTPS directas a Vercel; por eso todavía debe comprobarse el acceso desde el VPS y no se declara validado el retorno público.
+
+## Preview protegido por Vercel: acceso del VPS
+
+El VPS recibió `HTTP 302` con destino `https://vercel.com/sso-api`. Esto confirma que la autenticación de Vercel intercepta el retorno antes de llegar a MONZO. No quitar Deployment Protection ni cambiar la autenticación de la aplicación.
+
+La integración admite **Protection Bypass for Automation**, la función de Vercel para accesos de servidor. En el proyecto `monzo-v`: **Settings → Deployment Protection → Protection Bypass for Automation**. Crear la clave desde esa sección cuando se haya preparado el archivo privado del VPS; MONZO no puede generar ni inventar una clave aceptada por Vercel. No pegarla en el chat, en argumentos de comandos o en URLs. La clave concede acceso a los despliegues protegidos del proyecto: conservarla solo en el servidor y revocarla en Vercel si se expone.
+
+El gateway lee `VERCEL_AUTOMATION_BYPASS_SECRET` de `.env.evolution` y la manda únicamente en la cabecera `x-vercel-protection-bypass` al origen de retorno fijo bajo `.vercel.app`. Nunca la envía a Evolution, al navegador ni a destinos de redirección. Se conserva la firma HMAC independiente; pasar la protección de Vercel no autoriza solicitudes al probe de MONZO.
+
+La variable es opcional para sitios sin esa protección. Si se proporciona, se validan longitud/formato, que no se reutilice una clave interna, y el destino HTTPS de Vercel. Un retorno con redirección se informa como `CALLBACK_REDIRECT`, sin seguirlo ni mostrar la URL SSO o sus parámetros. Las respuestas de Vercel 401/403 continúan siendo fallos de autorización. No se agregan cookies de sesión ni automatizaciones de inicio de sesión personal.
+
+Después de generar `.env.evolution` con setup, guardar la clave **desde stdin**. Si el host tiene Node 24, estos son los comandos; el valor ingresado no aparece en pantalla ni queda como argumento o entrada literal del historial:
+
+```bash
+read -r -s -p 'Clave de automatizaciones de Vercel: ' monzo_vercel_bypass
+printf '\n'
+printf '%s' "$monzo_vercel_bypass" | node scripts/set-evolution-vercel-bypass.mjs
+unset monzo_vercel_bypass
+node scripts/check-evolution-preview.mjs
+```
+
+Para el VPS, donde no se verificó la versión de Node del host, usar la imagen fijada sin instalar o cambiar Node:
+
+```bash
+read -r -s -p 'Clave de automatizaciones de Vercel: ' monzo_vercel_bypass
+printf '\n'
+printf '%s' "$monzo_vercel_bypass" | sudo docker run --rm -i \
+  --user "$(id -u):$(id -g)" \
+  --mount "type=bind,src=$PWD,dst=/workspace" --workdir /workspace \
+  node:24-bookworm-slim@sha256:873f586f3794f52281bd039bf02c048a0be08fde619338f9941bad1eb6b34530 \
+  node scripts/set-evolution-vercel-bypass.mjs
+unset monzo_vercel_bypass
+sudo docker run --rm --user "$(id -u):$(id -g)" \
+  --mount "type=bind,src=$PWD,dst=/workspace" --workdir /workspace \
+  node:24-bookworm-slim@sha256:873f586f3794f52281bd039bf02c048a0be08fde619338f9941bad1eb6b34530 \
+  node scripts/check-evolution-preview.mjs
+```
+
+El setter conserva las otras credenciales, valida el destino y reemplaza atómicamente el archivo con permisos 0600. No copia esta clave a `.evolution/vercel.env`; ese archivo contiene solamente las tres variables de conexión de MONZO. Repetir setup conserva también esta clave. Un valor vacío/incorrecto o un archivo enlazado se rechaza sin escribir. El script de comprobación hace una consulta GET al probe y espera HTTP 405; no envía mensajes ni imprime cuerpos, cabeceras privadas o redirecciones.
+
+Si el stack ya estaba iniciado, aplicar el cambio solo al gateway tras aprobar su actualización:
+
+```bash
+sudo docker compose --env-file .env.evolution -f compose.evolution.yaml up -d --build --no-deps --wait evolution-gateway
+```
+
+Fuentes oficiales del mecanismo: [variable de entorno de Vercel](https://github.com/vercel/vercel/blob/main/packages/functions/src/get-env.ts) y [cabecera usada por Vercel CLI](https://github.com/vercel/vercel/blob/main/packages/cli/src/commands/curl/index.ts). Las pruebas locales cubren cabecera al destino fijo, ausencia de filtraciones al proveedor, rechazo de claves incorrectas, redirecciones no seguidas y persistencia privada. La aceptación de una clave real por el preview sigue pendiente de configurar y comprobar desde el VPS.
+
+Verificación de este ajuste: 17 pruebas Node de gateway/configuración, 8 pruebas de MONZO (incluyendo escritorio y móvil), TypeScript, lint y build Webpack. Los cuatro servicios Docker locales alcanzan salud correcta con la nueva configuración opcional. El 302 del VPS fue comprobado con su salida enviada por el usuario; no se aplicaron cambios en su VPS ni en Deployment Protection durante el desarrollo.

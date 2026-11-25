@@ -18,7 +18,11 @@ async function listen(server, t) {
   );
   return `http://127.0.0.1:${server.address().port}`;
 }
-async function rig(t, { auth = true, version = '2.3.8', proof = true } = {}) {
+async function rig(
+  t,
+  { auth = true, version = '2.3.8', proof = true, vercelProtection = false, vercelKey = '' } = {},
+) {
+  const expectedVercelKey = key();
   const apiKey = key(),
     gatewayKey = key(),
     webhookSecret = key();
@@ -26,7 +30,11 @@ async function rig(t, { auth = true, version = '2.3.8', proof = true } = {}) {
   let callbacks = 0;
   const evo = await listen(
     createServer((req, res) => {
-      seen.push({ path: req.url, authorization: req.headers.apikey });
+      seen.push({
+        path: req.url,
+        authorization: req.headers.apikey,
+        vercel: req.headers['x-vercel-protection-bypass'],
+      });
       res.setHeader('Content-Type', 'application/json');
       if (req.url === '/') return res.end(JSON.stringify({ version }));
       if (req.url === '/instance/fetchInstances') {
@@ -48,6 +56,13 @@ async function rig(t, { auth = true, version = '2.3.8', proof = true } = {}) {
   const callback = await listen(
     createServer(async (req, res) => {
       callbacks++;
+      if (vercelProtection && req.headers['x-vercel-protection-bypass'] !== expectedVercelKey) {
+        req.resume();
+        res.writeHead(302, { location: 'https://vercel.com/sso-api?redacted-test-parameter=1' });
+        return res.end();
+      }
+      if (vercelProtection)
+        assert.equal(req.headers['x-vercel-protection-bypass'], expectedVercelKey);
       const chunks = [];
       for await (const part of req) chunks.push(part);
       const raw = Buffer.concat(chunks);
@@ -79,6 +94,7 @@ async function rig(t, { auth = true, version = '2.3.8', proof = true } = {}) {
     EVOLUTION_API_KEY: apiKey,
     EVOLUTION_GATEWAY_KEY: gatewayKey,
     EVOLUTION_WEBHOOK_SECRET: webhookSecret,
+    VERCEL_AUTOMATION_BYPASS_SECRET: vercelKey === 'correct' ? expectedVercelKey : vercelKey,
   });
   const gateway = await listen(createGateway(config), t);
   const post = (body) =>
@@ -236,4 +252,78 @@ test('HTTP: exige Bearer, limita solicitudes autenticadas y mantiene la consulta
   });
   assert.equal(limited.status, 429);
   assert.equal((await fetch(r.gateway + '/healthz')).status, 200);
+});
+test('Vercel: redirección SSO se informa sin seguirla, también con clave incorrecta', async (t) => {
+  for (const vercelKey of ['', key()]) {
+    const r = await rig(t, { vercelProtection: true, vercelKey });
+    const result = await (
+      await r.post({ challenge: key(), callbackUrl: r.config.callbackUrl })
+    ).json();
+    assert.equal(result.callback.code, 'CALLBACK_REDIRECT');
+    assert.equal(result.callback.ok, false);
+    assert.equal(r.callbacks(), 1);
+    assert.equal(JSON.stringify(result).includes('sso-api'), false);
+  }
+});
+test('Vercel: clave solo al callback fijo; proveedor y respuesta no reciben esa credencial', async (t) => {
+  const r = await rig(t, { vercelProtection: true, vercelKey: 'correct' });
+  const result = await (
+    await r.post({ challenge: key(), callbackUrl: r.config.callbackUrl })
+  ).json();
+  assert.equal(result.evolution.ok, true);
+  assert.equal(result.callback.ok, true);
+  assert.ok(r.seen.every((call) => call.vercel === undefined));
+  assert.equal(JSON.stringify(result).includes(r.config.vercelBypassSecret), false);
+});
+test('Vercel: formato de cabecera, destinos e independencia de claves se validan antes de enviar', () => {
+  const env = {
+    EVOLUTION_API_KEY: key(),
+    EVOLUTION_GATEWAY_KEY: key(),
+    EVOLUTION_WEBHOOK_SECRET: key(),
+    MONZO_CALLBACK_URL: 'https://preview.vercel.app' + PROBE_PATH,
+    VERCEL_AUTOMATION_BYPASS_SECRET: key(),
+  };
+  assert.ok(readConfig(env).vercelBypassSecret);
+  for (const change of [
+    { VERCEL_AUTOMATION_BYPASS_SECRET: 'short' },
+    { VERCEL_AUTOMATION_BYPASS_SECRET: key() + '$HOME' },
+    { VERCEL_AUTOMATION_BYPASS_SECRET: key() + String.fromCharCode(34) },
+    { VERCEL_AUTOMATION_BYPASS_SECRET: key() + String.fromCharCode(92) },
+    { VERCEL_AUTOMATION_BYPASS_SECRET: key() + '\r\nx-extra: injected' },
+    { VERCEL_AUTOMATION_BYPASS_SECRET: 'x'.repeat(513) },
+    { VERCEL_AUTOMATION_BYPASS_SECRET: env.EVOLUTION_API_KEY },
+    { MONZO_CALLBACK_URL: 'https://not-vercel.example.test' + PROBE_PATH },
+    { MONZO_CALLBACK_URL: 'https://preview.vercel.app.attacker.example' + PROBE_PATH },
+  ])
+    assert.throws(() => readConfig({ ...env, ...change }), /CONFIG_VERCEL_AUTH/);
+});
+test('comprobación del preview: verifica HTTP 405 sin mostrar claves ni seguir redirecciones', async () => {
+  const { checkPreviewAccess } = await import('../../../scripts/check-evolution-preview.mjs');
+  const secret = key();
+  const config = {
+    callbackUrl: 'https://preview.vercel.app' + PROBE_PATH,
+    vercelBypassSecret: secret,
+  };
+  const calls = [];
+  const access = await checkPreviewAccess(config, async (url, init) => {
+    calls.push(url);
+    assert.equal(init.method, 'GET');
+    assert.equal(init.redirect, 'manual');
+    assert.deepEqual(Object.keys(init.headers), ['x-vercel-protection-bypass']);
+    assert.ok(init.headers['x-vercel-protection-bypass'] === secret);
+    return new Response(null, { status: 405 });
+  });
+  assert.deepEqual(access, { ok: true, code: 'OK', httpStatus: 405 });
+  assert.deepEqual(calls, [config.callbackUrl]);
+  const redirected = await checkPreviewAccess(
+    config,
+    async () =>
+      new Response(null, {
+        status: 302,
+        headers: { location: 'https://vercel.com/sso-api?private=not-exported' },
+      }),
+  );
+  assert.deepEqual(redirected, { ok: false, code: 'REDIRECT', httpStatus: 302 });
+  assert.equal(JSON.stringify(redirected).includes(secret), false);
+  assert.equal(JSON.stringify(redirected).includes('private='), false);
 });

@@ -5,6 +5,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parseEnv } from 'node:util';
 import { prepareEvolution } from '../../../scripts/setup-evolution.mjs';
+import { setVercelBypass } from '../../../scripts/set-evolution-vercel-bypass.mjs';
+import { randomBytes } from 'node:crypto';
 test('setup: conserva claves, separa entornos y genera Nginx sin modificar el sistema', (t) => {
   const directory = mkdtempSync(join(tmpdir(), 'monzo-evolution-setup-'));
   t.after(() => rmSync(directory, { recursive: true, force: true }));
@@ -96,4 +98,51 @@ test('setup: conserva configuraciones editadas y rechaza enlaces a archivos exte
   symlinkSync(external, join(directory, '.evolution/vercel.env'));
   assert.throws(() => prepareEvolution(options), /symbolic links/);
   assert.equal(readFileSync(external, 'utf8'), 'preserve\n');
+});
+test('Vercel: guarda la clave privadamente por stdin sin rotar credenciales ni exportarla al cliente MONZO', async (t) => {
+  const { spawnSync } = await import('node:child_process');
+  const { resolve } = await import('node:path');
+  const directory = mkdtempSync(join(tmpdir(), 'monzo-vercel-private-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const options = {
+    directory,
+    domain: 'onlineboosty.com.ar',
+    monzoOrigin: 'https://preview.vercel.app',
+  };
+  prepareEvolution(options);
+  const filename = join(directory, '.env.evolution');
+  const original = parseEnv(readFileSync(filename, 'utf8'));
+  const secret = randomBytes(32).toString('hex');
+  const script = resolve('scripts/set-evolution-vercel-bypass.mjs');
+  const result = spawnSync(process.execPath, [script], {
+    cwd: directory,
+    input: secret,
+    encoding: 'utf8',
+  });
+  assert.equal(result.status, 0);
+  assert.equal((result.stdout + result.stderr).includes(secret), false);
+  const saved = parseEnv(readFileSync(filename, 'utf8'));
+  assert.ok(saved.VERCEL_AUTOMATION_BYPASS_SECRET === secret);
+  assert.ok(
+    Object.keys(original).every((name) => saved[name] === original[name]),
+    'Existing configuration must be preserved.',
+  );
+  assert.equal(statSync(filename).mode & 0o777, 0o600);
+  assert.equal(
+    readFileSync(join(directory, '.evolution/vercel.env'), 'utf8').includes(secret),
+    false,
+  );
+  prepareEvolution(options);
+  assert.ok(parseEnv(readFileSync(filename, 'utf8')).VERCEL_AUTOMATION_BYPASS_SECRET === secret);
+  const unchanged = readFileSync(filename, 'utf8');
+  for (const invalid of ['short', secret + '\nX-Header: injection', 'x'.repeat(513)])
+    assert.throws(() => setVercelBypass(directory, invalid));
+  assert.ok(readFileSync(filename, 'utf8') === unchanged);
+  const forbiddenArgument = spawnSync(
+    process.execPath,
+    [script, 'do-not-put-secrets-in-arguments'],
+    { cwd: directory, encoding: 'utf8' },
+  );
+  assert.equal(forbiddenArgument.status, 1);
+  assert.ok(readFileSync(filename, 'utf8') === unchanged);
 });

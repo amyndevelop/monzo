@@ -126,6 +126,7 @@ const reportSchema = z
           'NOT_CHECKED',
           'CALLBACK_UNREACHABLE',
           'CALLBACK_AUTH',
+          'CALLBACK_REDIRECT',
           'CALLBACK_RESPONSE',
         ]),
       })
@@ -216,6 +217,8 @@ export async function checkEvolutionGateway(
       'El retorno se comprueba cuando Evolution y su credencial responden correctamente.',
     CALLBACK_UNREACHABLE:
       'El VPS no pudo completar el retorno a MONZO. Revisá la URL y la disponibilidad del sitio.',
+    CALLBACK_REDIRECT:
+      'El retorno redirige a otra página. Si Vercel pide iniciar sesión, revisá el acceso para automatizaciones del VPS.',
     CALLBACK_AUTH:
       'El retorno fue rechazado. Revisá la clave de firma y si la protección del sitio de prueba bloquea las solicitudes del VPS.',
     CALLBACK_RESPONSE:

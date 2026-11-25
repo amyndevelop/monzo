@@ -120,6 +120,7 @@ services:
       EVOLUTION_GATEWAY_KEY: ${EVOLUTION_GATEWAY_KEY:?Run the Evolution setup script first}
       EVOLUTION_WEBHOOK_SECRET: ${EVOLUTION_WEBHOOK_SECRET:?Run the Evolution setup script first}
       MONZO_CALLBACK_URL: ${MONZO_ORIGIN}/api/integrations/evolution/probe
+      VERCEL_AUTOMATION_BYPASS_SECRET: ${VERCEL_AUTOMATION_BYPASS_SECRET:-}
       NODE_USE_ENV_PROXY: '1'
       NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1},evolution,evolution-db,evolution-redis
       no_proxy: ${NO_PROXY:-localhost,127.0.0.1},evolution,evolution-db,evolution-redis

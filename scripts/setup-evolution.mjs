@@ -3,6 +3,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync, lstatSyn
 import { parseArgs, parseEnv } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
+import { readConfig } from '../services/evolution-gateway/core.mjs';
+import { PROBE_PATH } from '../services/evolution-gateway/protocol.mjs';
 
 export function prepareEvolution({ directory, domain, monzoOrigin, port = 18085 }) {
   if (
@@ -88,6 +90,7 @@ export function prepareEvolution({ directory, domain, monzoOrigin, port = 18085 
     ).size !== 5
   )
     throw new Error('Use independent credentials for each purpose.');
+  readConfig({ ...config, MONZO_CALLBACK_URL: origin.origin + PROBE_PATH });
   mkdirSync(resolve(directory, '.evolution'), { recursive: true, mode: 0o700 });
   chmodSync(resolve(directory, '.evolution'), 0o700);
   writeFileSync(

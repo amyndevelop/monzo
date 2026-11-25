@@ -22,7 +22,8 @@ getent ahostsv6 onlineboosty.com.ar || true
 printf '\nConfirmed virtual host target:\n'
 readlink -f /etc/nginx/sites-enabled/renovar-onlineboosty || true
 printf '\nCertificate identity and validity (no private key is read):\n'
-sudo openssl x509 -in /etc/letsencrypt/live/onlineboosty.com.ar/fullchain.pem -noout -dates -checkhost onlineboosty.com.ar -checkend 604800 || true
+sudo openssl x509 -in /etc/letsencrypt/live/onlineboosty.com.ar/fullchain.pem -noout -dates -checkend 604800 || true
+sudo openssl x509 -in /etc/letsencrypt/live/onlineboosty.com.ar/fullchain.pem -noout -checkhost onlineboosty.com.ar || true
 printf '\nCertbot renewal method and ACME webroot:\n'
 sudo grep -nE '^(authenticator|installer|webroot_path)[[:space:]]*=' /etc/letsencrypt/renewal/onlineboosty.com.ar.conf || true
 printf '\nCertbot version:\n'

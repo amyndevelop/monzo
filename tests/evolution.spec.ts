@@ -51,6 +51,23 @@ test('Evolution: configuración y reportes rechazan destinos inseguros, versione
     },
   );
   expect(report.ok).toBe(true);
+  const redirected = await checkEvolutionGateway(
+    config,
+    'https://monzo.example.test',
+    async (_url, init) =>
+      Response.json({
+        protocol: PROTOCOL,
+        challenge: JSON.parse(init.body).challenge,
+        checkedAt: new Date().toISOString(),
+        evolution: { ok: true, code: 'OK', version: '2.3.8' },
+        callback: { ok: false, code: 'CALLBACK_REDIRECT' },
+      }),
+  );
+  expect(redirected.ok).toBe(false);
+  expect(redirected.checks.find((check) => check.name === 'callback')?.message).toContain(
+    'automatizaciones',
+  );
+
   expect(JSON.stringify(report)).not.toContain(env.EVOLUTION_GATEWAY_KEY);
   for (const mismatch of ['challenge', 'version', 'consistency', 'time']) {
     await expect(

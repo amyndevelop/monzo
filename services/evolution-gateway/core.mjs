@@ -8,6 +8,9 @@ import {
   secretPattern,
 } from './protocol.mjs';
 
+// Bound the opaque key and exclude header injection and dotenv interpolation/escaping.
+export const automationSecretPattern = /^[A-Za-z0-9._~+\/=-]{16,512}$/;
+
 export class GatewayError extends Error {
   constructor(code, status = 502) {
     super(code);
@@ -22,6 +25,7 @@ export function readConfig(env) {
     gatewayKey: env.EVOLUTION_GATEWAY_KEY ?? '',
     webhookSecret: env.EVOLUTION_WEBHOOK_SECRET ?? '',
     callbackUrl: env.MONZO_CALLBACK_URL ?? '',
+    vercelBypassSecret: env.VERCEL_AUTOMATION_BYPASS_SECRET ?? '',
     version: '2.3.8',
     port: Number(env.PORT ?? 9080),
   };
@@ -63,6 +67,18 @@ export function readConfig(env) {
     throw new GatewayError('CONFIG_CALLBACK', 503);
   if (callback.protocol === 'https:' && (isLoopback(callback) || callback.port))
     throw new GatewayError('CONFIG_CALLBACK', 503);
+  if (
+    config.vercelBypassSecret &&
+    (!automationSecretPattern.test(config.vercelBypassSecret) ||
+      [config.apiKey, config.gatewayKey, config.webhookSecret].includes(
+        config.vercelBypassSecret,
+      ) ||
+      !(
+        (callback.protocol === 'https:' && callback.hostname.endsWith('.vercel.app')) ||
+        (localTest && callback.protocol === 'http:' && isLoopback(callback))
+      ))
+  )
+    throw new GatewayError('CONFIG_VERCEL_AUTH', 503);
   if (!Number.isInteger(config.port) || config.port < 1024 || config.port > 65535)
     throw new GatewayError('CONFIG_PORT', 503);
   return { ...config, evolutionOrigin: origin.origin, callbackUrl: callback.href };
@@ -158,10 +174,14 @@ export async function diagnostics(config, input, transport = fetch, now = Date.n
   try {
     callback = await transport(config.callbackUrl, {
       method: 'POST',
-      redirect: 'error',
+      // Inspect redirects without following them or forwarding any credentials.
+      redirect: 'manual',
       signal: AbortSignal.timeout(7000),
       headers: {
         'content-type': 'application/json',
+        ...(config.vercelBypassSecret
+          ? { 'x-vercel-protection-bypass': config.vercelBypassSecret }
+          : {}),
         'x-monzo-timestamp': timestamp,
         'x-monzo-nonce': nonce,
         'x-monzo-signature': probeSignature(config.webhookSecret, body, timestamp, nonce),
@@ -170,6 +190,10 @@ export async function diagnostics(config, input, transport = fetch, now = Date.n
     });
   } catch {
     return { ...result, callback: { ok: false, code: 'CALLBACK_UNREACHABLE' } };
+  }
+  if (callback.status >= 300 && callback.status < 400) {
+    await callback.body?.cancel();
+    return { ...result, callback: { ok: false, code: 'CALLBACK_REDIRECT' } };
   }
   if ([401, 403].includes(callback.status)) {
     await callback.body?.cancel();
