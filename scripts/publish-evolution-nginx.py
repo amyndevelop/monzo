@@ -2,14 +2,18 @@
 """Check/apply only the known onlineboosty vhost, with snapshot and automatic recovery."""
 import argparse
 import hashlib
+import http.client
 import json
 import os
 from pathlib import Path
 import signal
+import socket
+import ssl
 import stat
 import subprocess
 import sys
 import tempfile
+import time
 import urllib.request
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -22,6 +26,23 @@ DOMAIN = "onlineboosty.com.ar"
 
 class PublishError(Exception):
     pass
+
+
+class HttpsCheckError(PublishError):
+    """Contains only a bounded diagnostic, never response bodies or credentials."""
+    pass
+
+
+def failure_reason(error, phase):
+    if isinstance(error, HttpsCheckError):
+        return str(error)
+    if isinstance(error, subprocess.CalledProcessError):
+        return phase + " devolvió código " + str(error.returncode)
+    if isinstance(error, OSError):
+        return phase + " falló por un error del sistema (" + str(error.errno) + ")"
+    if isinstance(error, KeyboardInterrupt):
+        return "La operación fue interrumpida"
+    return "Falló la etapa: " + phase
 
 
 def regular(path):
@@ -89,19 +110,24 @@ def apply_site(proposal, target, backups, validate, reload_service, postcheck, i
     directory, metadata = snapshot_site(target, backups)
     if target.read_bytes() != before or (directory / "original.conf").read_bytes() != before:
         raise PublishError("El sitio cambió durante la comprobación; no se reemplazó.")
+    phase = "instalación del archivo"
     try:
         atomic_copy(proposal, target, install_metadata or metadata)
+        phase = "validación de Nginx"
         validate(target)
+        phase = "recarga de Nginx"
         reload_service()
+        phase = "comprobación HTTPS"
         postcheck()
-    except BaseException:
+    except BaseException as error:
+        reason = failure_reason(error, phase)
         try:
             atomic_copy(directory / "original.conf", target, metadata)
             validate(target)
             reload_service()
         except BaseException:
-            raise PublishError("Falló el cambio y la recuperación requiere revisión. Respaldo: " + str(directory)) from None
-        raise PublishError("Cambio cancelado; se restauró la configuración anterior. Respaldo: " + str(directory)) from None
+            raise PublishError("Falló el cambio y la recuperación requiere revisión. Motivo: " + reason + ". Respaldo: " + str(directory)) from None
+        raise PublishError("Cambio cancelado; se restauró la configuración anterior. Motivo: " + reason + ". Respaldo: " + str(directory)) from None
     return directory
 
 
@@ -131,10 +157,60 @@ def reload_nginx():
     subprocess.run(["systemctl", "reload", "nginx"], check=True)
 
 
-def https_check():
-    result = subprocess.run(["curl", "--silent", "--show-error", "--max-time", "10", "--resolve", DOMAIN + ":443:127.0.0.1", "--request", "POST", "--header", "Content-Type: application/json", "--data", "{}", "--output", "/dev/null", "--write-out", "%{http_code}", "https://" + DOMAIN + "/v1/diagnostics"], check=True, capture_output=True, text=True)
-    if result.stdout.strip() != "401":
-        raise PublishError("La comprobación HTTPS sin credencial no devolvió el 401 esperado.")
+def probe_local_https(timeout, *, address=("127.0.0.1", 443), context=None):
+    # Connect locally but validate the certificate and SNI for the real domain.
+    # No DNS/proxy redirect, authentication header, or customer data is involved.
+    context = context or ssl.create_default_context()
+    connection = http.client.HTTPSConnection(DOMAIN, timeout=timeout, context=context)
+    try:
+        raw = socket.create_connection(address, timeout=timeout)
+        try:
+            connection.sock = context.wrap_socket(raw, server_hostname=DOMAIN)
+        except BaseException:
+            raw.close()
+            raise
+        connection.request("POST", "/v1/diagnostics", body=b"{}", headers={"Content-Type": "application/json", "Connection": "close"})
+        response = connection.getresponse()
+        body = response.read(4097)
+        matched = False
+        if len(body) <= 4096:
+            try:
+                matched = json.loads(body) == {"error": "UNAUTHORIZED"}
+            except (ValueError, UnicodeError, RecursionError):
+                pass
+        return response.status, matched
+    finally:
+        connection.close()
+
+
+def https_check(*, probe=probe_local_https, clock=time.monotonic, pause=time.sleep, budget=15.0):
+    # Reload only signals Nginx. Give its new workers a bounded time to take over.
+    deadline = clock() + budget
+    reason = "Sin respuesta HTTPS"
+    while True:
+        remaining = deadline - clock()
+        if remaining <= 0:
+            raise HttpsCheckError(reason + "; se esperaba HTTP 401 del gateway")
+        try:
+            status, matched = probe(min(3.0, remaining))
+            if status == 401 and matched:
+                return
+            if type(status) is int and 100 <= status <= 599:
+                reason = "HTTP " + str(status)
+                if status == 401:
+                    reason += " con una respuesta que no corresponde al gateway"
+            else:
+                reason = "Respuesta HTTP no válida"
+        except ssl.SSLCertVerificationError:
+            raise HttpsCheckError("El certificado HTTPS local no pasó la verificación de confianza/nombre") from None
+        except ssl.SSLError:
+            reason = "No se completó la conexión TLS local"
+        except (OSError, http.client.HTTPException):
+            reason = "No se obtuvo una respuesta HTTPS local"
+        remaining = deadline - clock()
+        if remaining <= 0:
+            raise HttpsCheckError(reason + "; se esperaba HTTP 401 del gateway")
+        pause(min(0.5, remaining))
 
 
 def main():

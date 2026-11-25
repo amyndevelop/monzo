@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
 """Exercise publication and rollback only in temporary directories; never calls host Nginx."""
 import importlib.util
+import http.server
 import json
 import os
 from pathlib import Path
 import stat
+import ssl
+import subprocess
+import threading
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -99,6 +103,113 @@ class NginxPublicationTests(unittest.TestCase):
         self.assertEqual(command[-2:], [str(self.proposal), str(self.target)])
         self.assertIn('mount --bind "$1" "$2"', command[-4])
         self.assertNotIn(str(self.proposal), command[-4])
+
+
+class HttpsReadinessTests(unittest.TestCase):
+    def runner(self, responses, budget=1.0):
+        elapsed = [0.0]
+        calls = []
+        def probe(timeout):
+            calls.append(timeout)
+            item = responses[min(len(calls) - 1, len(responses) - 1)]
+            if isinstance(item, BaseException):
+                raise item
+            return item
+        def pause(delay):
+            elapsed[0] += delay
+        module.https_check(probe=probe, clock=lambda: elapsed[0], pause=pause, budget=budget)
+        return calls, elapsed[0]
+
+    def test_graceful_reload_allows_old_worker_before_new_gateway(self):
+        calls, elapsed = self.runner([(404, False), (401, True)])
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(elapsed, 0.5)
+
+    def test_transient_disconnect_can_recover(self):
+        calls, _elapsed = self.runner([ConnectionResetError(), (401, True)])
+        self.assertEqual(len(calls), 2)
+
+    def test_wrong_http_status_is_bounded_and_reported(self):
+        with self.assertRaisesRegex(module.HttpsCheckError, "HTTP 404"):
+            self.runner([(404, False)])
+
+    def test_401_from_another_service_is_not_accepted(self):
+        with self.assertRaisesRegex(module.HttpsCheckError, "no corresponde al gateway"):
+            self.runner([(401, False)])
+
+    def test_certificate_verification_never_skipped_or_retried(self):
+        calls = []
+        def reject(_timeout):
+            calls.append(True)
+            raise ssl.SSLCertVerificationError("private failure details must not be printed")
+        with self.assertRaisesRegex(module.HttpsCheckError, "certificado HTTPS") as failure:
+            module.https_check(probe=reject)
+        self.assertEqual(len(calls), 1)
+        self.assertNotIn("private failure", str(failure.exception))
+
+    def test_rollback_preserves_safe_https_reason(self):
+        case = NginxPublicationTests()
+        case.setUp()
+        try:
+            def reject():
+                raise module.HttpsCheckError("HTTP 502; se esperaba HTTP 401 del gateway")
+            with self.assertRaisesRegex(module.PublishError, "HTTP 502"):
+                case.apply(postcheck=reject)
+            self.assertEqual(case.target.read_text(), "original site\n")
+        finally:
+            case.doCleanups()
+
+    def test_unknown_errors_do_not_expose_values(self):
+        case = NginxPublicationTests()
+        case.setUp()
+        try:
+            def reject():
+                raise RuntimeError("private-fixture-value-not-for-output")
+            with self.assertRaises(module.PublishError) as failure:
+                case.apply(postcheck=reject)
+            self.assertIn("comprobación HTTPS", str(failure.exception))
+            self.assertNotIn("private-fixture-value", str(failure.exception))
+        finally:
+            case.doCleanups()
+
+
+class RealHttpsProbeTests(unittest.TestCase):
+    def test_tls_hostname_method_and_gateway_marker(self):
+        with tempfile.TemporaryDirectory(prefix="monzo-local-tls-") as directory:
+            base = Path(directory)
+            cert, key = base / "cert.pem", base / "key.pem"
+            subprocess.run(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1", "-subj", "/CN=" + module.DOMAIN, "-addext", "subjectAltName=DNS:" + module.DOMAIN, "-keyout", str(key), "-out", str(cert)], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            key.chmod(0o600)
+            class Handler(http.server.BaseHTTPRequestHandler):
+                def log_message(self, _format, *_args):
+                    pass
+                def do_POST(self):
+                    self.server.seen.append((self.path, self.headers.get('Host'), self.headers.get('Authorization'), self.rfile.read(int(self.headers['Content-Length']))))
+                    self.send_response(401)
+                    self.send_header('Content-Type', 'application/json')
+                    self.send_header('Content-Length', str(len(self.server.payload)))
+                    self.end_headers()
+                    self.wfile.write(self.server.payload)
+            server = http.server.ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+            server.seen = []
+            server.payload = b'{"error":"UNAUTHORIZED"}'
+            context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+            context.load_cert_chain(certfile=cert, keyfile=key)
+            server.socket = context.wrap_socket(server.socket, server_side=True)
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            try:
+                trusted = ssl.create_default_context(cafile=cert)
+                self.assertEqual(module.probe_local_https(3, address=server.server_address, context=trusted), (401, True))
+                self.assertEqual(server.seen[0], ('/v1/diagnostics', module.DOMAIN, None, b'{}'))
+                server.payload = b'<html>different authorization page</html>'
+                self.assertEqual(module.probe_local_https(3, address=server.server_address, context=trusted), (401, False))
+                with self.assertRaises(ssl.SSLCertVerificationError):
+                    module.probe_local_https(3, address=server.server_address)
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(5)
 
 
 if __name__ == "__main__":
