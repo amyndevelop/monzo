@@ -2,6 +2,10 @@
 
 Estado: preparación en rama independiente `feat/evolution-integration`, desde `92e435032889a571f83a98d8a1c04aa49e9807fa`. No implica instalación en el VPS ni publicación en Vercel. Dominio elegido: **https://onlineboosty.com.ar**, raíz del dominio, sin subdominio. Su contenido actual se reemplazará cuando el usuario apruebe el despliegue.
 
+## Operación en el VPS endurecido
+
+El diagnóstico confirmó que el motor Docker del sistema tiene puente, NAT y forwarding deshabilitados. Para este VPS se usa el [motor rootless dedicado a MONZO](evolution-rootless-vps.md). Los comandos de arranque del stack se ejecutan con `./scripts/evolution-compose.sh`, sin sudo. Los comandos de helpers sin red con el motor del sistema permanecen como referencia de la preparación ya realizada.
+
 ## Alcance y resultado esperado
 
 El stack levanta Evolution API, una base PostgreSQL exclusiva, Redis exclusivo y un gateway Node pequeño. MONZO incorpora en Canales una comprobación explícita del servicio y versión, de la credencial interna y de un retorno HMAC autenticado. Un resultado correcto demuestra esos tres controles en ese momento; **no demuestra que un número esté vinculado ni que un mensaje haya llegado**.
@@ -82,8 +86,8 @@ Los archivos Nginx se preparan para el Certbot existente del VPS (include SSL y 
 Para levantar exclusivamente el proyecto nuevo:
 
 ```bash
-sudo docker compose --env-file .env.evolution -f compose.evolution.yaml up -d --build --wait
-sudo docker compose --env-file .env.evolution -f compose.evolution.yaml ps
+./scripts/evolution-compose.sh up -d --build --wait
+./scripts/evolution-compose.sh ps
 curl --fail http://127.0.0.1:18085/healthz
 ```
 
@@ -171,7 +175,7 @@ El setter conserva las otras credenciales, valida el destino y reemplaza atómic
 Si el stack ya estaba iniciado, aplicar el cambio solo al gateway tras aprobar su actualización:
 
 ```bash
-sudo docker compose --env-file .env.evolution -f compose.evolution.yaml up -d --build --no-deps --wait evolution-gateway
+./scripts/evolution-compose.sh up -d --build --no-deps --wait evolution-gateway
 ```
 
 Fuentes oficiales del mecanismo: [variable de entorno de Vercel](https://github.com/vercel/vercel/blob/main/packages/functions/src/get-env.ts) y [cabecera usada por Vercel CLI](https://github.com/vercel/vercel/blob/main/packages/cli/src/commands/curl/index.ts). Las pruebas locales cubren cabecera al destino fijo, ausencia de filtraciones al proveedor, rechazo de claves incorrectas, redirecciones no seguidas y persistencia privada. La aceptación de una clave real por el preview sigue pendiente de configurar y comprobar desde el VPS.

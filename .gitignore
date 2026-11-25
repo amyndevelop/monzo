@@ -10,3 +10,5 @@ out/
 playwright-report/
 test-results/
 .DS_Store
+
+__pycache__/
