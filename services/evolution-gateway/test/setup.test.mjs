@@ -146,3 +146,34 @@ test('Vercel: guarda la clave privadamente por stdin sin rotar credenciales ni e
   assert.equal(forbiddenArgument.status, 1);
   assert.ok(readFileSync(filename, 'utf8') === unchanged);
 });
+test('Vercel CLI: distingue archivo inicial ausente y entrada vacía sin mostrar la clave', async (t) => {
+  const { spawnSync } = await import('node:child_process');
+  const { resolve } = await import('node:path');
+  const directory = mkdtempSync(join(tmpdir(), 'monzo-vercel-missing-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const script = resolve('scripts/set-evolution-vercel-bypass.mjs');
+  const secret = randomBytes(32).toString('hex');
+  const missing = spawnSync(process.execPath, [script], {
+    cwd: directory,
+    input: secret,
+    encoding: 'utf8',
+  });
+  assert.equal(missing.status, 1);
+  assert.match(missing.stderr, /Falta \.env\.evolution/);
+  assert.equal((missing.stdout + missing.stderr).includes(secret), false);
+  const empty = spawnSync(process.execPath, [script], {
+    cwd: directory,
+    input: '',
+    encoding: 'utf8',
+  });
+  assert.equal(empty.status, 1);
+  assert.match(empty.stderr, /No llegó ninguna clave/);
+  const invalid = spawnSync(process.execPath, [script], {
+    cwd: directory,
+    input: 'incomplete-private-key$',
+    encoding: 'utf8',
+  });
+  assert.equal(invalid.status, 1);
+  assert.match(invalid.stderr, /formato incompleto o no válido/);
+  assert.equal((invalid.stdout + invalid.stderr).includes('incomplete-private-key$'), false);
+});

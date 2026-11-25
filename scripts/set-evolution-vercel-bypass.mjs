@@ -8,7 +8,9 @@ import { PROBE_PATH } from '../services/evolution-gateway/protocol.mjs';
 
 export function setVercelBypass(directory, input) {
   const secret = input.replace(/\r?\n$/, '');
-  if (!automationSecretPattern.test(secret)) throw new Error('Invalid automation key format.');
+  if (!secret) throw Object.assign(new Error('EMPTY_INPUT'), { code: 'EMPTY_INPUT' });
+  if (!automationSecretPattern.test(secret))
+    throw Object.assign(new Error('INVALID_INPUT'), { code: 'INVALID_INPUT' });
   const filename = resolve(directory, '.env.evolution');
   const info = lstatSync(filename);
   if (!info.isFile() || info.isSymbolicLink())
@@ -48,9 +50,29 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     }
     setVercelBypass(process.cwd(), Buffer.concat(chunks).toString('utf8'));
     console.log('Clave de automatizaciones de Vercel guardada en el archivo privado.');
-  } catch {
+  } catch (error) {
+    const messages = {
+      ENOENT:
+        'Falta .env.evolution. Primero ejecutá scripts/setup-evolution.mjs para crear la configuración privada.',
+      EACCES:
+        'No hay permisos para leer o guardar la configuración privada. Revisá el propietario del archivo y del directorio.',
+      EPERM:
+        'No hay permisos para guardar la configuración privada. Revisá el propietario del archivo y del directorio.',
+      EMPTY_INPUT:
+        'No llegó ninguna clave por la entrada privada. Volvé a pegar la misma clave en el campo oculto.',
+      INVALID_INPUT:
+        'La clave recibida tiene un formato incompleto o no válido. Copiá el valor completo sin comillas ni espacios.',
+      CONFIG_SECRETS:
+        'La configuración interna está incompleta. Revisá la preparación inicial antes de guardar la clave de Vercel.',
+      CONFIG_URL:
+        'La configuración no contiene un origen de retorno válido. Revisá MONZO_ORIGIN sin compartir credenciales.',
+      CONFIG_CALLBACK: 'El retorno debe apuntar al origen HTTPS del preview de MONZO.',
+      CONFIG_VERCEL_AUTH:
+        'La clave debe ser independiente y el retorno debe apuntar al preview bajo .vercel.app.',
+    };
     console.error(
-      'No pudimos guardar la clave. Revisá que .env.evolution exista, que apunte al preview de Vercel y que hayas pegado la clave completa.',
+      messages[error?.code] ??
+        'No pudimos guardar la clave. Revisá la configuración privada de Evolution.',
     );
     process.exitCode = 1;
   }

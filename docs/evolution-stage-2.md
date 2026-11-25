@@ -70,7 +70,7 @@ sudo docker compose version
 Desde el checkout de esta rama, generar configuración sin instalar Node ni cambiar el Node del host:
 
 ```bash
-sudo docker run --rm --user "$(id -u):$(id -g)" \
+sudo docker run --rm --network none --user "$(id -u):$(id -g)" \
   --mount "type=bind,src=$PWD,dst=/workspace" --workdir /workspace \
   node:24-bookworm-slim@sha256:873f586f3794f52281bd039bf02c048a0be08fde619338f9941bad1eb6b34530 \
   node scripts/setup-evolution.mjs --domain onlineboosty.com.ar \
@@ -154,7 +154,7 @@ Para el VPS, donde no se verificó la versión de Node del host, usar la imagen 
 ```bash
 read -r -s -p 'Clave de automatizaciones de Vercel: ' monzo_vercel_bypass
 printf '\n'
-printf '%s' "$monzo_vercel_bypass" | sudo docker run --rm -i \
+printf '%s' "$monzo_vercel_bypass" | sudo docker run --rm -i --network none \
   --user "$(id -u):$(id -g)" \
   --mount "type=bind,src=$PWD,dst=/workspace" --workdir /workspace \
   node:24-bookworm-slim@sha256:873f586f3794f52281bd039bf02c048a0be08fde619338f9941bad1eb6b34530 \
@@ -177,3 +177,9 @@ sudo docker compose --env-file .env.evolution -f compose.evolution.yaml up -d --
 Fuentes oficiales del mecanismo: [variable de entorno de Vercel](https://github.com/vercel/vercel/blob/main/packages/functions/src/get-env.ts) y [cabecera usada por Vercel CLI](https://github.com/vercel/vercel/blob/main/packages/cli/src/commands/curl/index.ts). Las pruebas locales cubren cabecera al destino fijo, ausencia de filtraciones al proveedor, rechazo de claves incorrectas, redirecciones no seguidas y persistencia privada. La aceptación de una clave real por el preview sigue pendiente de configurar y comprobar desde el VPS.
 
 Verificación de este ajuste: 17 pruebas Node de gateway/configuración, 8 pruebas de MONZO (incluyendo escritorio y móvil), TypeScript, lint y build Webpack. Los cuatro servicios Docker locales alcanzan salud correcta con la nueva configuración opcional. El 302 del VPS fue comprobado con su salida enviada por el usuario; no se aplicaron cambios en su VPS ni en Deployment Protection durante el desarrollo.
+
+## Recuperación si no se creó la configuración inicial
+
+La operación en el VPS confirmó que `.env.evolution` todavía no existe. Clonar el repositorio no crea ese archivo: es necesario ejecutar setup y verificar su mensaje final antes de introducir la clave de Vercel. El setter distingue archivo ausente, permisos, entrada vacía/formato y configuración de retorno, con mensajes fijos que no muestran valores privados. No generar otra clave de Vercel para corregir un archivo ausente.
+
+El aviso `IPv4 forwarding is disabled` es independiente del guardado: setup y setter solo necesitan archivos locales y se ejecutan con `--network none`. La conectividad de los contenedores de Evolution deberá resolverse antes de iniciar el servicio y validar su retorno. No habilitar globalmente el reenvío IP ni modificar reglas del firewall sin revisar la configuración del VPS y los servicios existentes.
