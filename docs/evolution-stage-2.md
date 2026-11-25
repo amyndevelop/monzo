@@ -70,12 +70,11 @@ sudo docker compose version
 Desde el checkout de esta rama, generar configuración sin instalar Node ni cambiar el Node del host:
 
 ```bash
-read -r -p 'Origen HTTPS exacto del preview de MONZO: ' monzo_preview_origin
 sudo docker run --rm --user "$(id -u):$(id -g)" \
   --mount "type=bind,src=$PWD,dst=/workspace" --workdir /workspace \
   node:24-bookworm-slim@sha256:873f586f3794f52281bd039bf02c048a0be08fde619338f9941bad1eb6b34530 \
   node scripts/setup-evolution.mjs --domain onlineboosty.com.ar \
-  --monzo-origin "$monzo_preview_origin"
+  --monzo-origin https://monzo-v-git-feat-evolution-integration-arqen2.vercel.app
 ```
 
 Los archivos Nginx se preparan para el Certbot existente del VPS (include SSL y webroot `/var/www/letsencrypt`). Setup no imprime claves, no cambia DNS/Nginx y no arranca servicios. Repetirlo con los mismos destinos conserva claves. Rechaza otro origen/puerto/dominio y archivos Nginx modificados; revisar y preservar la configuración anterior en lugar de borrarla para forzar una regeneración.
@@ -123,3 +122,9 @@ Los tests HTTP del gateway usan servidores locales controlados; los de MONZO ver
 Resultados de la preparación local: 12 pruebas Node de gateway/setup y 20 pruebas seleccionadas de MONZO (Evolution y QR existente) pasaron. Build Webpack, TypeScript y lint comprobados. El stack real Evolution 2.3.8 alcanzó salud correcta en sus cuatro servicios; su API aceptó la credencial interna, devolvió 401 sin credencial y el gateway devolvió 404 para rutas administrativas. La prueba de reinicio conserva los volúmenes. Esto no equivale a instalación en el VPS, TLS público, restauración de sesiones ni envío WhatsApp.
 
 La dirección que se debe cargar como `MONZO_ORIGIN` es la del sitio Preview que Vercel crea para esta rama, accesible en **proyecto MONZO → Deployments → rama feat/evolution-integration → Ready → Visit**. No es la URL del panel de Vercel ni `onlineboosty.com.ar`, que pertenece al gateway. Si el despliegue no existe o falló, resolver primero esa publicación de prueba; no sustituirla por la URL de producción.
+
+## Dirección fija identificada en el estado de Vercel
+
+El check de Vercel del commit `7dcd3ab` publica el dominio de rama **https://monzo-v-git-feat-evolution-integration-arqen2.vercel.app**. Usar ese origen para `MONZO_ORIGIN` del VPS y para `BETTER_AUTH_URL` del entorno Preview específico de esta rama, junto con su base de pruebas y secretos independientes. La URL con hash que se abre desde Visit identifica un despliegue puntual y no es el origen operativo para esta conexión. No cambiar la configuración Production.
+
+La dirección fue identificada desde el check público de GitHub. El entorno de desarrollo bloquea sus solicitudes HTTPS directas a Vercel; por eso todavía debe comprobarse el acceso desde el VPS y no se declara validado el retorno público.
