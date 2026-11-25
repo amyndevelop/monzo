@@ -19,6 +19,12 @@ printf '\nDomain IPv4 addresses:\n'
 getent ahostsv4 onlineboosty.com.ar || true
 printf '\nDomain IPv6 addresses (remove or correct stale AAAA before TLS):\n'
 getent ahostsv6 onlineboosty.com.ar || true
+printf '\nConfirmed virtual host target:\n'
+readlink -f /etc/nginx/sites-enabled/renovar-onlineboosty || true
+printf '\nCertificate identity and validity (no private key is read):\n'
+sudo openssl x509 -in /etc/letsencrypt/live/onlineboosty.com.ar/fullchain.pem -noout -dates -checkhost onlineboosty.com.ar -checkend 604800 || true
+printf '\nCertbot renewal method and ACME webroot:\n'
+sudo grep -nE '^(authenticator|installer|webroot_path)[[:space:]]*=' /etc/letsencrypt/renewal/onlineboosty.com.ar.conf || true
 printf '\nCertbot version:\n'
 certbot --version || true
 printf '\nPackage simulation only (review removals and upgrades before installation):\n'

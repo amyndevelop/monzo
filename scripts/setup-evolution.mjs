@@ -106,7 +106,7 @@ export function prepareEvolution({ directory, domain, monzoOrigin, port = 18085 
     { mode: 0o600 },
   );
   chmodSync(vercel, 0o600);
-  const common = `server_name ${domain};\n    client_max_body_size 2k;\n    location /.well-known/acme-challenge/ { root /var/lib/monzo-evolution/acme; }\n`;
+  const common = `server_name ${domain};\n    client_max_body_size 2k;\n    location /.well-known/acme-challenge/ { root /var/www/letsencrypt; }\n`;
   const proxy = `location = /v1/diagnostics {\n        limit_except POST { deny all; }\n        proxy_pass http://127.0.0.1:${port};\n        proxy_connect_timeout 3s;\n        proxy_read_timeout 35s;\n        proxy_send_timeout 10s;\n        proxy_set_header Host $host;\n        proxy_set_header X-Forwarded-Proto https;\n        proxy_set_header Connection \"\";\n    }\n    location / { return 404; }`;
   const writeNginx = (filename, content, options) => {
     if (existsSync(filename) && readFileSync(filename, 'utf8') !== content)
@@ -123,7 +123,7 @@ export function prepareEvolution({ directory, domain, monzoOrigin, port = 18085 
   );
   writeNginx(
     resolve(directory, '.evolution', 'nginx-https.conf'),
-    `server {\n    listen 80;\n    listen [::]:80;\n    ${common}    location / { return 301 https://$host$request_uri; }\n}\nserver {\n    listen 443 ssl;\n    listen [::]:443 ssl;\n    server_name ${domain};\n    ssl_certificate /etc/letsencrypt/live/${domain}/fullchain.pem;\n    ssl_certificate_key /etc/letsencrypt/live/${domain}/privkey.pem;\n    ssl_protocols TLSv1.2 TLSv1.3;\n    client_max_body_size 2k;\n    access_log off;\n    add_header X-Content-Type-Options nosniff always;\n    ${proxy}\n}\n`,
+    `server {\n    listen 80;\n    listen [::]:80;\n    ${common}    location / { return 301 https://$host$request_uri; }\n}\nserver {\n    listen 443 ssl;\n    listen [::]:443 ssl;\n    server_name ${domain};\n    ssl_certificate /etc/letsencrypt/live/${domain}/fullchain.pem;\n    ssl_certificate_key /etc/letsencrypt/live/${domain}/privkey.pem;\n    include /etc/letsencrypt/options-ssl-nginx.conf;\n    client_max_body_size 2k;\n    access_log off;\n    add_header X-Content-Type-Options nosniff always;\n    ${proxy}\n}\n`,
     { mode: 0o600 },
   );
   return { domain, origin: origin.origin, port };

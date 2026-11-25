@@ -31,6 +31,17 @@ test('setup: conserva claves, separa entornos y genera Nginx sin modificar el si
   const nginx = readFileSync(join(directory, '.evolution/nginx-https.conf'), 'utf8');
   assert.ok(nginx.includes('server_name onlineboosty.com.ar;'));
   assert.ok(nginx.includes('127.0.0.1:18085'));
+  assert.ok(nginx.includes('root /var/www/letsencrypt;'));
+  assert.ok(nginx.includes('include /etc/letsencrypt/options-ssl-nginx.conf;'));
+  assert.ok(
+    nginx.includes('ssl_certificate /etc/letsencrypt/live/onlineboosty.com.ar/fullchain.pem;'),
+  );
+  assert.ok(
+    nginx.includes('ssl_certificate_key /etc/letsencrypt/live/onlineboosty.com.ar/privkey.pem;'),
+  );
+  const http = readFileSync(join(directory, '.evolution/nginx-http.conf'), 'utf8');
+  assert.ok(http.includes('location /.well-known/acme-challenge/ { root /var/www/letsencrypt; }'));
+  assert.equal(http.includes('ssl_certificate'), false);
   assert.equal(nginx.includes(env.EVOLUTION_API_KEY), false);
   prepareEvolution(options);
   assert.ok(

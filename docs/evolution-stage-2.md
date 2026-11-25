@@ -53,7 +53,7 @@ git log -1 --oneline
 bash scripts/evolution-preflight.sh
 ```
 
-Revisar la simulación de apt: no proceder si propone retirar/reemplazar Docker o servicios actuales. Identificar el archivo exacto que hoy declara `server_name onlineboosty.com.ar`; conservar copia, destinos y certificados existentes. Revisar A y AAAA para que ambos apunten al VPS que atenderá HTTPS. No se verificó DNS ni se conoce aún ese archivo del servidor. **No copiar un segundo virtual host con el mismo `server_name` sobre el existente ni borrar configuraciones ajenas.**
+Revisar la simulación de apt: no proceder si propone retirar/reemplazar Docker o servicios actuales. Identificar el archivo exacto que hoy declara `server_name onlineboosty.com.ar`; conservar copia, destinos y certificados existentes. Revisar A y AAAA para que ambos apunten al VPS que atenderá HTTPS. El usuario confirmó que el registro A y la interfaz eth0 del VPS coinciden en **66.97.40.21**. El sitio activo es `/etc/nginx/sites-enabled/renovar-onlineboosty`, enlazado a `/etc/nginx/sites-available/renovar-onlineboosty`. AAAA y la vigencia/renovación del certificado aún deben comprobarse. **No copiar un segundo virtual host con el mismo `server_name` sobre el existente ni borrar configuraciones ajenas.**
 
 ## Comandos de preparación, después de aprobar instalación
 
@@ -78,7 +78,7 @@ sudo docker run --rm --user "$(id -u):$(id -g)" \
   --monzo-origin "$monzo_preview_origin"
 ```
 
-Setup no imprime claves, no cambia DNS/Nginx y no arranca servicios. Repetirlo con los mismos destinos conserva claves. Rechaza otro origen/puerto/dominio y archivos Nginx modificados; revisar y preservar la configuración anterior en lugar de borrarla para forzar una regeneración.
+Los archivos Nginx se preparan para el Certbot existente del VPS (include SSL y webroot `/var/www/letsencrypt`). Setup no imprime claves, no cambia DNS/Nginx y no arranca servicios. Repetirlo con los mismos destinos conserva claves. Rechaza otro origen/puerto/dominio y archivos Nginx modificados; revisar y preservar la configuración anterior en lugar de borrarla para forzar una regeneración.
 
 Para levantar exclusivamente el proyecto nuevo:
 
@@ -90,11 +90,11 @@ curl --fail http://127.0.0.1:18085/healthz
 
 No ejecutar `down -v`, `docker system prune` ni reiniciar Docker. No conectar números en esta etapa. La comprobación de salud del gateway solo demuestra que ese proceso responde; el botón de MONZO realiza los controles restantes.
 
-## HTTPS y preview: revisión pendiente del virtual host
+## HTTPS y preview: sitio y Certbot identificados
 
-Se generan `.evolution/nginx-http.conf` para ACME webroot y `.evolution/nginx-https.conf` para TLS. Son archivos de propuesta, no cambios activos. La instalación deberá usar el **archivo real identificado en el preflight**, respaldarlo y sustituir únicamente ese sitio, tras aprobación. Si el certificado actual es válido puede conservarse; si no existe, usar Certbot webroot con `/var/lib/monzo-evolution/acme`. Revisar antes instalación de Certbot y reglas de firewall; no abrir 18085, PostgreSQL o Redis al público.
+Se generan `.evolution/nginx-http.conf` para ACME webroot y `.evolution/nginx-https.conf` para TLS. Son archivos de propuesta, no cambios activos. La instalación deberá usar el **archivo real identificado en el preflight**, respaldarlo y sustituir únicamente ese sitio, tras aprobación. El certificado configurado está en `/etc/letsencrypt/live/onlineboosty.com.ar/fullchain.pem`, con su clave privada en el mismo directorio. La propuesta conserva esas rutas, el include `/etc/letsencrypt/options-ssl-nginx.conf` y el webroot ACME existente **`/var/www/letsencrypt`**. No volver a emitir el certificado si sigue válido; comprobar vigencia y renovación antes de aplicar. Revisar antes instalación de Certbot y reglas de firewall; no abrir 18085, PostgreSQL o Redis al público.
 
-Antes de cada recarga: `sudo nginx -t`. Solo si pasa, `sudo systemctl reload nginx`. Verificar que los otros sitios siguen respondiendo. No se provee un comando que sobrescriba una ruta inventada: falta identificar el virtual host del VPS. Esto no impide preparar y probar el stack.
+Antes de cada recarga: `sudo nginx -t`. Solo si pasa, `sudo systemctl reload nginx`. Verificar que los otros sitios siguen respondiendo. El único archivo de sitio a reemplazar será `/etc/nginx/sites-available/renovar-onlineboosty`; se conserva el enlace de `sites-enabled`. Respaldarlo antes, validar el archivo propuesto con `nginx -t` y restaurar la copia si esa validación falla. No instalar un segundo sitio con el mismo dominio.
 
 Importar privadamente **las tres variables** de `.evolution/vercel.env` en el entorno Preview de la rama. No pegarlas en este chat. No son variables `NEXT_PUBLIC_*`. El API key global de Evolution y las claves de PostgreSQL/Redis permanecen solo en el VPS. El preview también requiere su origen de autenticación y base de datos de pruebas separados. Crear un deployment nuevo para que reciba las variables; no asumir que un deployment anterior se actualiza.
 
@@ -121,3 +121,5 @@ npm test -- tests/evolution.spec.ts tests/whatsapp-qr.spec.ts tests/whatsapp-qr-
 Los tests HTTP del gateway usan servidores locales controlados; los de MONZO verifican el callback Next real, autorización y UX de escritorio/móvil. Los reportes de UI son simulados explícitamente en Playwright. No se enviaron mensajes a Meta ni WhatsApp. El build usa Next Webpack. La prueba Docker utiliza la imagen real Evolution, base y Redis propios, y un origen de retorno local de prueba no productivo. La publicación y el retorno desde el VPS por HTTPS se verificarán después de instalar; no están confirmados por las pruebas locales.
 
 Resultados de la preparación local: 12 pruebas Node de gateway/setup y 20 pruebas seleccionadas de MONZO (Evolution y QR existente) pasaron. Build Webpack, TypeScript y lint comprobados. El stack real Evolution 2.3.8 alcanzó salud correcta en sus cuatro servicios; su API aceptó la credencial interna, devolvió 401 sin credencial y el gateway devolvió 404 para rutas administrativas. La prueba de reinicio conserva los volúmenes. Esto no equivale a instalación en el VPS, TLS público, restauración de sesiones ni envío WhatsApp.
+
+La dirección que se debe cargar como `MONZO_ORIGIN` es la del sitio Preview que Vercel crea para esta rama, accesible en **proyecto MONZO → Deployments → rama feat/evolution-integration → Ready → Visit**. No es la URL del panel de Vercel ni `onlineboosty.com.ar`, que pertenece al gateway. Si el despliegue no existe o falló, resolver primero esa publicación de prueba; no sustituirla por la URL de producción.
