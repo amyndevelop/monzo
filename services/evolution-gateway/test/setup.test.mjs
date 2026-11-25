@@ -32,6 +32,13 @@ test('setup: conserva claves, separa entornos y genera Nginx sin modificar el si
   assert.equal(statSync(join(directory, '.evolution')).mode & 0o777, 0o700);
   const nginx = readFileSync(join(directory, '.evolution/nginx-https.conf'), 'utf8');
   assert.ok(nginx.includes('server_name onlineboosty.com.ar;'));
+  assert.equal(
+    nginx,
+    readFileSync(
+      new URL('../../../deploy/evolution/nginx-onlineboosty.conf', import.meta.url),
+      'utf8',
+    ),
+  );
   assert.ok(nginx.includes('127.0.0.1:18085'));
   assert.ok(nginx.includes('root /var/www/letsencrypt;'));
   assert.ok(nginx.includes('include /etc/letsencrypt/options-ssl-nginx.conf;'));

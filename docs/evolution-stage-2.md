@@ -187,3 +187,31 @@ Verificación de este ajuste: 17 pruebas Node de gateway/configuración, 8 prueb
 La operación en el VPS confirmó que `.env.evolution` todavía no existe. Clonar el repositorio no crea ese archivo: es necesario ejecutar setup y verificar su mensaje final antes de introducir la clave de Vercel. El setter distingue archivo ausente, permisos, entrada vacía/formato y configuración de retorno, con mensajes fijos que no muestran valores privados. No generar otra clave de Vercel para corregir un archivo ausente.
 
 El aviso `IPv4 forwarding is disabled` es independiente del guardado: setup y setter solo necesitan archivos locales y se ejecutan con `--network none`. La conectividad de los contenedores de Evolution deberá resolverse antes de iniciar el servicio y validar su retorno. No habilitar globalmente el reenvío IP ni modificar reglas del firewall sin revisar la configuración del VPS y los servicios existentes.
+
+## Comprobación y publicación HTTPS del sitio identificado
+
+El usuario confirmó en el VPS el motor rootless Docker 29.1.3 con cgroups 2/systemd, los cuatro servicios Evolution/Redis/PostgreSQL/gateway en Healthy, persistencia mediante unidad de usuario y linger, y `http://127.0.0.1:18085/healthz` devolviendo `{"ok":true,"protocol":"monzo-evolution-v1"}`. El forwarding global del VPS continúa en 0. El sitio público todavía no se reemplazó.
+
+La propuesta pública y revisable está en `deploy/evolution/nginx-onlineboosty.conf`. Las pruebas comprueban que coincide con la plantilla generada por setup para el dominio y puerto de este VPS. Solo publica POST `/v1/diagnostics` hacia el gateway local; la raíz del dominio responde 404. MONZO continúa en su dirección de Vercel.
+
+Primero, comprobar desde el VPS, sin publicar:
+
+```bash
+sudo python3 scripts/publish-evolution-nginx.py --check
+```
+
+Requiere sudo para leer los certificados y ejecutar la comprobación de Nginx. Verifica el enlace exacto del sitio, la vigencia/identidad del certificado, el gateway local y la configuración actual. Después monta temporalmente la propuesta sobre el archivo del sitio **en un namespace de montajes privado**, ejecuta `nginx -t` y termina. No copia archivos sobre la configuración activa, no recarga Nginx ni crea respaldos durante `--check`. No cambiar esta comprobación por un montaje compartido ni por editar primero el archivo activo.
+
+Después de un resultado correcto, revisar el alcance con el usuario y obtener la aprobación de publicación que pidió antes de modificar producción. El paso aprobado será:
+
+```bash
+sudo python3 scripts/publish-evolution-nginx.py --apply
+```
+
+Se reemplaza únicamente `/etc/nginx/sites-available/renovar-onlineboosty`, conservando el enlace de `sites-enabled`, los permisos/propietario del archivo y las rutas de Certbot. Antes se guarda una copia privada con checksum y metadatos en `/var/backups/monzo-evolution-nginx/cambio-*/`. La copia nueva se instala atómicamente y Nginx vuelve a validarse antes de una **recarga**, sin reiniciar el servicio.
+
+La comprobación posterior usa HTTPS con el nombre del dominio y resolución local a 127.0.0.1. Envía una solicitud sin credencial y exige el rechazo HTTP 401; no carga claves ni realiza llamadas autenticadas de MONZO. Si la validación, recarga o comprobación HTTPS falla, la herramienta restaura automáticamente el archivo anterior y lo recarga. Si también falla esa recuperación, muestra el directorio del respaldo para intervención manual; no declara éxito.
+
+El comando imprime la ruta concreta del respaldo. Para restaurarlo posteriormente, usar esa ruta como argumento de `--rollback`. La restauración verifica el checksum, propiedad y permisos del respaldo, comprueba la propuesta en un namespace privado y guarda también una copia de la configuración que reemplaza. No borra respaldos, certificados, volúmenes ni datos.
+
+Pruebas locales de esta herramienta: publicación en archivos temporales, permisos y checksum; rechazo previo sin cambiar el sitio; restauración ante validación/recarga/HTTPS fallidos; rechazo de cambios concurrentes, enlaces y copias alteradas. Las llamadas reales a Nginx y montajes del VPS se validan con `--check` antes de publicar; los tests locales no se presentan como comprobación real del servidor.

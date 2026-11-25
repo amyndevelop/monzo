@@ -6,7 +6,7 @@ El VPS usa Docker 29.1.3 con `iptables=false`, `ip6tables=false`, `ip-forward=fa
 
 El usuario confirmó que `rootlesskit`, `slirp4netns`, `newuidmap` y `newgidmap` ya existen. `adminuh` tiene UID 1000 y rangos subuid/subgid 100000:65536. La creación de una red privada con `rootlesskit --net=slirp4netns --disable-host-loopback` pasó en el VPS, con AppArmor restrictivo activo. El aviso de resolv.conf de esa prueba no implica fallo; el lanzador oficial copia `/etc` y `/run` dentro del entorno privado para manejar esos archivos.
 
-Esta entrega **prepara** un motor de usuario exclusivo para MONZO. No se declaró todavía iniciado en el VPS ni validado el stack Evolution con ese motor. Los servicios anteriores y el motor Docker del sistema quedan fuera de esta instalación.
+El usuario confirmó el motor de usuario en el VPS, con Docker 29.1.3, cgroups 2 y driver systemd, más los cuatro contenedores en Healthy. La unidad quedó habilitada y linger activo. El gateway responde en 127.0.0.1:18085 y el forwarding del host sigue en 0. La publicación HTTPS y el retorno HMAC real todavía deben completarse. Los servicios anteriores y el motor Docker del sistema quedan fuera de esta instalación.
 
 ## Archivos y aislamiento
 
