@@ -83,9 +83,23 @@ Orden del piloto técnico: vincular el secundario, escribir desde el personal, r
 
 Este componente es una base de desarrollo; no equivale a integración completa, persistencia de comandos/eventos ni vinculación real. El gateway publicado continúa exponiendo solo el diagnóstico de Etapa 2.
 
+## Persistencia durable del gateway
+
+El Preview ya mostró al usuario con **sesión verificada** y la empresa de pruebas creada (nombre elegido por el usuario: BOISTIFY). La captura confirma el recorrido de acceso; no demuestra una vinculación ni mensajes de Evolution.
+
+`services/evolution-gateway/durable-store.mjs` incorpora un journal local de SQLite nativo de Node 24, sin paquetes nuevos. Los cuerpos, QR y datos de cuenta se cifran con AES-256-GCM y contexto de registro; los hashes de contenido para idempotencia usan HMAC para evitar comparaciones de texto predecible desde una copia del archivo. Solo permanecen en claro identificadores opacos, secuencias, tiempos y estados operativos. El directorio/archivo requieren propietario y permisos privados. Una clave de almacenamiento independiente será necesaria al integrarlo; no se reutiliza la de sesión del Preview.
+
+La conexión SQLite conserva una concesión exclusiva de archivo: un segundo gateway sobre el mismo spool se rechaza. Las transacciones son síncronas, usan WAL y synchronous=FULL y revierten también ante un error interno capturado por el llamador. Se mantienen registros de idempotencia de comandos al reconectar: el mismo comando no puede ejecutarse de nuevo en otra generación. Los pendientes de una generación anterior se cancelan; las escrituras de cuenta obsoletas se rechazan.
+
+Los eventos se reintentan conservando orden por cuenta, con espera y concesión; otra cuenta puede avanzar sin esperar a la primera. Tras un cierre abrupto, un evento no confirmado vuelve a estar disponible. Un comando que estaba ejecutándose pasa a UNKNOWN y no se vuelve a reclamar automáticamente. Resultado y notificación pueden confirmarse en una misma transacción. Los eventos confirmados se purgan tras la retención; los tombstones de envíos permanecen y el contenido antiguo de comandos notificados se redacta. Hay límites de tamaño/cantidad y de páginas SQLite (256 MiB por defecto, más WAL acotado por checkpoints); alcanzar capacidad devuelve error, no borra eventos pendientes para hacer espacio.
+
+Este módulo todavía **no está registrado en main/server, copiado a la imagen del gateway, montado en Compose ni habilitado en el VPS**. No se generaron claves de almacenamiento reales y no hay cambios de esquema de MONZO en este incremento. Falta integrar receptor y relay firmado, ciclo de instancia, envío y front de Canales antes de vincular un número.
+
+Validación: 47 pruebas locales de probe/gateway/instancias/setup/spool pasaron. Las once del spool incluyen recuperación después de un **SIGKILL real** de un proceso de prueba, no reenvío de comandos inciertos, orden, aislamiento, fencing, rollback, límites, retención, clave incorrecta y alteración del ciphertext. Esas mismas once pasaron dentro de la imagen Node fijada, sin red, raíz de solo lectura, almacenamiento temporal, usuario sin privilegios y límite de memoria de 128 MiB. Ninguna usó archivos reales del VPS ni contactó WhatsApp.
+
 ## Integración pendiente
 
-1. Persistencia durable de comandos, eventos, generaciones y deduplicación; firma y confirmación de recepción del retorno, reintentos y límites. Definir almacenamiento de adjuntos privado y acotado antes de habilitarlos.
+1. Integrar el journal durable con comandos, eventos y generaciones del gateway; completar firma/confirmación del retorno, despacho y límites. Definir almacenamiento de adjuntos privado y acotado antes de habilitarlos.
 2. Modelo/migración de cuentas Evolution sin reutilizar credenciales de Meta ni la sesión del worker Baileys existente. Las rutas y workers deben seleccionar el proveedor explícitamente.
 3. Canales: preparación del teléfono por propietario, escaneo/renovación/caducidad, identidad comprobada, conexión/desconexión y recuperación. QR oculto a miembros sin permiso; abortar solicitudes al cambiar de empresa; confirmación real antes de anunciar Conectado.
 4. Conversaciones: recepción/envío, recibos fuera de orden, duplicados, mensajes desde el teléfono, pausa del bot ante intervención humana y recuperación de resultado incierto. Integrar adjuntos e historial acotado con límites explícitos y conservación del compositor/borradores.
