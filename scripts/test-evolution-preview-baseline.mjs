@@ -25,6 +25,18 @@ try {
   const sql = baselineSql(migrations, expected, local.database);
   const artifact = baselineSql(migrations, expected);
   assert.equal(readFileSync('docs/sql/evolution-preview-baseline.sql', 'utf8'), artifact);
+  const inspectConstraints = readFileSync(
+    'docs/sql/evolution-preview-constraints-inspect.sql',
+    'utf8',
+  );
+  assert.ok(inspectConstraints.includes(expected.constraints));
+  assert.match(local.query(inspectConstraints), /\|0\|t$/);
+  local.query('ALTER TABLE "WhatsappAccount" DROP CONSTRAINT "WhatsappAccount_provider_check";');
+  assert.match(local.query(inspectConstraints), /\|0\|f$/);
+  local.query(
+    'ALTER TABLE "WhatsappAccount" ADD CONSTRAINT "WhatsappAccount_provider_check" CHECK ("provider" IN (\'META\',\'BAILEYS\'));',
+  );
+  assert.deepEqual(fingerprint(local), expected);
   const count = () => local.query('SELECT count(*) FROM _prisma_migrations;');
   const ledger = () =>
     local.query('SELECT row_to_json(h) FROM _prisma_migrations h ORDER BY migration_name;');
