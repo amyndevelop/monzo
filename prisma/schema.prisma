@@ -164,6 +164,8 @@ enum ConversationStatus {
 }
 
 model WhatsappAccount {
+  evolutionSession     EvolutionSession?
+  evolutionDeliveries  EvolutionDelivery[]
   provider             String                 @default("META")
   webSession           WhatsappWebSession?
   id                   String                 @id @default(cuid())
@@ -252,6 +254,7 @@ model Conversation {
 }
 
 model Message {
+  channelGeneration  Int?
   id                 String            @id @default(cuid())
   tenantId           String
   tenant             Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
@@ -292,6 +295,43 @@ model Message {
   @@index([tenantId, conversationId, createdAt])
   @@index([automationEventId, status])
   @@index([status, createdAt])
+}
+
+model EvolutionSession {
+  accountId         String          @id
+  tenantId          String
+  account           WhatsappAccount @relation(fields: [accountId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  expectedWaId      String
+  connectedWaId     String?
+  generation        Int             @default(1)
+  desiredState      String          @default("DISCONNECTED")
+  state             String          @default("DISCONNECTED")
+  qrEncrypted       String?
+  qrExpiresAt       DateTime?
+  lastSeenAt        DateTime?
+  lastEventSequence BigInt          @default(0)
+  lastErrorCode     String?
+  commandId         String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@unique([accountId, tenantId])
+  @@unique([tenantId, expectedWaId])
+  @@index([tenantId])
+}
+
+model EvolutionDelivery {
+  id          String          @id @db.VarChar(64)
+  tenantId    String
+  accountId   String
+  account     WhatsappAccount @relation(fields: [accountId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  generation  Int
+  sequence    BigInt
+  digest      String          @db.VarChar(64)
+  processedAt DateTime        @default(now())
+
+  @@index([accountId, processedAt])
+  @@index([processedAt])
 }
 
 model ConversationNote {

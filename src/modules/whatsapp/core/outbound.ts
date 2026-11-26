@@ -31,7 +31,12 @@ export async function processOutbound(
     where: { id: messageId },
     select: { tenantId: true, type: true, account: { select: { provider: true } } },
   });
-  if (!candidate || (candidate.account.provider === 'BAILEYS') !== Boolean(web)) return;
+  if (
+    !candidate ||
+    !['META', 'BAILEYS'].includes(candidate.account.provider) ||
+    (candidate.account.provider === 'BAILEYS') !== Boolean(web)
+  )
+    return;
   if (web && !['text', 'interactive'].includes(candidate.type)) {
     await db.message.updateMany({
       where: { id: messageId, status: 'QUEUED' },
