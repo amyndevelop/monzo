@@ -31,3 +31,9 @@ export function verifyEvent(
   now?: number,
 ): boolean;
 export function eventProof(secret: string, id: string, digest: string, nonce: string): string;
+export function outboundMessageId(
+  secret: string,
+  tenantId: string,
+  accountId: string,
+  messageId: string,
+): string;

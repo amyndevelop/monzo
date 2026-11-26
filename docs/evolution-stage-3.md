@@ -147,7 +147,18 @@ node --import tsx scripts/test-evolution-channel-contract.mjs
 
 Este incremento no completa la vinculación desde Canales: faltan las rutas autorizadas de propietario y la interfaz, el envío específico de Evolution, los adjuntos privados y la recuperación de historial. El normalizador prepara metadatos de adjuntos, pero no anuncia una descarga hasta que existan bytes verificados en su almacenamiento. **No habilitar todavía la bandera ni pedir al usuario escanear un código.**
 
-1. Completar el envío de mensajes con comandos idempotentes y resultado durable. Definir almacenamiento de adjuntos privado y acotado antes de habilitarlos.
+El incremento siguiente agrega el comando `send` y el adaptador privado de texto, todavía sin llamarlo desde las acciones del chat. El ID del proveedor se deriva por HMAC de empresa/cuenta/Message.id, independiente de la reconexión, y se valida antes de aceptar la cola. La clave del comando es necesariamente `message:<Message.id>`; repetir no cambia el contenido ni extiende su deadline original. El número debe seguir comprobado al ejecutar; una desconexión previa cancela sin enviar y un resultado incierto no vuelve a ejecutar el POST. Resultado y notificación quedan en la misma transacción del spool. `sendResult` en MONZO revalida cuenta/destino/generación y nunca retrocede un mensaje ya confirmado.
+
+La imagen derivada de Evolution incorpora un parche optativo `monzoMessageId` sobre el bundle fijado de 2.3.8. Se limita al método de texto de Baileys y al paso de su ID hacia el envío; sin ese campo se conserva la generación normal del proveedor. Los cuatro fragmentos deben existir exactamente una vez o el build se detiene; reaplicar también falla. Se verificaron los métodos reales del bundle en un VM aislado con transporte controlado: el ID llega al envío, formatos inválidos fallan antes de consultar números y el DTO/schema real conserva el campo adicional. No se ejecutó el proveedor ni se vinculó WhatsApp en esa prueba. La imagen completa con ambos parches se construyó offline correctamente. Licencia upstream conservada.
+
+El contrato hasta PostgreSQL ahora incluye el caso en que el proveedor emite el eco con ID conocido y luego pierde su respuesta: MONZO conserva un único mensaje, lo reconcilia a SENT y no pausa su propio bot. El resultado UNKNOWN posterior no deshace ese SENT. Las diez pruebas del receptor pasaron con resultados tardíos y generaciones; el envío real y su invocación desde el compositor siguen pendientes. El gateway además reserva un teléfono entre empresas hasta verificar el cierre anterior, incluso si ya se pidió desconectar.
+
+```bash
+# Extraer antes el bundle público de la imagen fijada, sin iniciar Evolution.
+node scripts/test-evolution-send-id-patch.mjs /tmp/monzo-evolution-main-unpatched.js
+```
+
+1. Conectar el envío durable del gateway a las acciones de MONZO. Definir almacenamiento de adjuntos privado y acotado antes de habilitarlos.
 2. Completar rutas y despachador de Evolution con selección explícita del proveedor, sin reutilizar credenciales de Meta ni la sesión del worker Baileys existente. La migración de Neon ya fue confirmada y el modelo está incorporado.
 3. Canales: preparación del teléfono por propietario, escaneo/renovación/caducidad, identidad comprobada, conexión/desconexión y recuperación. QR oculto a miembros sin permiso; abortar solicitudes al cambiar de empresa; confirmación real antes de anunciar Conectado.
 4. Conversaciones: recepción/envío, recibos fuera de orden, duplicados, mensajes desde el teléfono, pausa del bot ante intervención humana y recuperación de resultado incierto. Integrar adjuntos e historial acotado con límites explícitos y conservación del compositor/borradores.

@@ -5,7 +5,7 @@ import {
   instanceEventToken,
   InstanceError,
 } from './instance-client.mjs';
-import { sameSecret, PROTOCOL } from './protocol.mjs';
+import { sameSecret, PROTOCOL, outboundMessageId } from './protocol.mjs';
 import { providerCandidates, attestCandidate } from './provider-events.mjs';
 import { relayEvents } from './event-relay.mjs';
 import { StoreError } from './durable-store.mjs';
@@ -78,31 +78,87 @@ export class ChannelEngine {
       !input ||
       typeof input !== 'object' ||
       Array.isArray(input) ||
-      Object.keys(input).sort().join(',') !== 'commandId,deadline,operation,scope' ||
+      Object.keys(input).sort().join(',') !==
+        (input.operation === 'send'
+          ? 'commandId,data,deadline,operation,scope'
+          : 'commandId,deadline,operation,scope') ||
       typeof input.commandId !== 'string' ||
       !/^[a-zA-Z0-9:_-]{1,128}$/.test(input.commandId) ||
-      !['connect', 'refresh', 'disconnect'].includes(input.operation) ||
+      !['connect', 'refresh', 'disconnect', 'send'].includes(input.operation) ||
       !Number.isSafeInteger(input.deadline)
     )
       throw new ChannelError('INVALID_COMMAND', 400);
     const { name, ...scope } = instanceScope(input.scope);
     void name;
     const payload = { operation: input.operation, deadline: input.deadline };
+    if (input.operation === 'send') {
+      const data = input.data;
+      if (
+        !data ||
+        typeof data !== 'object' ||
+        Array.isArray(data) ||
+        Object.keys(data).sort().join(',') !== 'messageId,providerId,text,to' ||
+        typeof data.messageId !== 'string' ||
+        !/^[a-zA-Z0-9_-]{1,128}$/.test(data.messageId) ||
+        input.commandId !== 'message:' + data.messageId ||
+        typeof data.to !== 'string' ||
+        !/^[1-9][0-9]{5,14}$/.test(data.to) ||
+        data.to === scope.expectedPhone ||
+        typeof data.text !== 'string' ||
+        !data.text.trim() ||
+        data.text.length > 4096 ||
+        data.providerId !==
+          outboundMessageId(
+            this.#config.gatewayKey,
+            scope.tenantId,
+            scope.accountId,
+            data.messageId,
+          )
+      )
+        throw new ChannelError('INVALID_MESSAGE', 400);
+      payload.data = data;
+    }
     return this.#store.atomic(() => {
       const existing = this.#store.record(scope, 'command', input.commandId);
+      // Retry metadata must not extend the first accepted deadline. Logical
+      // scope/operation/content still pass the journal's idempotency check.
+      if (
+        existing &&
+        existing.scope.generation === scope.generation &&
+        existing.payload.operation === input.operation
+      )
+        payload.deadline = existing.payload.deadline;
       if (!existing && (input.deadline < this.#clock() || input.deadline > this.#clock() + 120000))
         throw new ChannelError('COMMAND_EXPIRED');
       const previous = this.#store.latest(scope);
+      if (
+        !existing &&
+        input.operation !== 'disconnect' &&
+        this.#store
+          .accounts()
+          .some(
+            (account) =>
+              account.scope.expectedPhone === scope.expectedPhone &&
+              (account.scope.accountId !== scope.accountId ||
+                account.scope.tenantId !== scope.tenantId) &&
+              (account.data.desiredState === 'CONNECTED' || !account.data.closed),
+          )
+      )
+        throw new ChannelError('PHONE_IN_USE');
       if (!existing && input.operation === 'refresh' && previous?.data.desiredState !== 'CONNECTED')
         throw new ChannelError('DISCONNECTED');
       if (!previous || scope.generation > previous.scope.generation) {
         if (input.operation !== 'connect') throw new ChannelError('STALE_GENERATION');
         if (!previous && this.#store.accounts().length >= 8)
           throw new ChannelError('CHANNEL_CAPACITY', 429);
-        this.#store.register(scope, { state: 'DISCONNECTED', desiredState: 'DISCONNECTED' });
+        this.#store.register(scope, {
+          state: 'DISCONNECTED',
+          desiredState: 'DISCONNECTED',
+          closed: true,
+        });
       }
       const record = this.#store.enqueue(scope, 'command', input.commandId, payload);
-      if (!existing) {
+      if (!existing && input.operation !== 'send') {
         const current = this.#store.account(scope);
         const disconnect = input.operation === 'disconnect';
         this.#store.updateAccount(scope, {
@@ -117,6 +173,7 @@ export class ChannelEngine {
           qrExpiresAt: null,
           lastErrorCode: null,
           commandId: input.commandId,
+          ...(disconnect ? {} : { closed: false }),
         });
       }
       return {
@@ -183,6 +240,7 @@ export class ChannelEngine {
       data.connectedPhone = null;
       data.qr = null;
       data.qrExpiresAt = null;
+      if (['NOT_CREATED', 'DISCONNECTED'].includes(status.state)) data.closed = true;
     }
     const payload = {
       type: 'connection',
@@ -218,6 +276,13 @@ export class ChannelEngine {
   async drainCommands() {
     for (const result of this.#store.pendingResults())
       this.#store.atomic(() => {
+        if (result.payload.operation === 'send') {
+          this.#notifySend(
+            result,
+            result.result ?? { state: 'UNKNOWN', code: 'PROCESS_INTERRUPTED' },
+          );
+          return;
+        }
         const latest = this.#store.latest(result.scope);
         if (latest?.scope.generation === result.scope.generation)
           this.#apply(result.scope, { state: 'ERROR' }, 'PROCESS_INTERRUPTED');
@@ -240,7 +305,15 @@ export class ChannelEngine {
               result = { state: 'CANCELED', code: 'DISCONNECT_REQUESTED' };
             else {
               let status;
-              if (record.payload.operation === 'disconnect') {
+              if (record.payload.operation === 'send') {
+                const check = await this.#client.status(scope);
+                if (check.state !== 'CONNECTED' || check.connectedPhone !== scope.expectedPhone)
+                  throw new InstanceError('CHANNEL_NOT_CONNECTED');
+                const { messageId, ...data } = record.payload.data;
+                void messageId;
+                const providerId = await this.#client.sendText(scope, data);
+                result = { state: 'DONE', code: 'OK', providerId };
+              } else if (record.payload.operation === 'disconnect') {
                 status = await this.#client.disconnect(scope);
                 if (!['NOT_CREATED', 'DISCONNECTED'].includes(status.state))
                   throw new InstanceError('INSTANCE_DISCONNECT_PENDING', true);
@@ -255,18 +328,46 @@ export class ChannelEngine {
               }
               // A newer request can be accepted while a provider call is in flight.
               // Preserve its desired state and never overwrite a newer generation.
-              this.#apply(scope, status);
-              result = { state: 'DONE', code: 'OK' };
+              if (status) {
+                this.#apply(scope, status);
+                result = { state: 'DONE', code: 'OK' };
+              }
             }
           } catch (error) {
             const code = codes.has(error.code) ? error.code : 'INSTANCE_UNREACHABLE';
-            result = { state: error.uncertain ? 'UNKNOWN' : 'FAILED', code };
+            result = {
+              state:
+                error.uncertain ||
+                (record.payload.operation === 'send' && !(error instanceof InstanceError))
+                  ? 'UNKNOWN'
+                  : 'FAILED',
+              code: record.payload.operation === 'send' ? (error.code ?? 'RESULT_UNKNOWN') : code,
+            };
             const latest = this.#store.latest(scope);
-            if (latest?.scope.generation === scope.generation)
+            if (record.payload.operation === 'send' && error.code === 'NUMBER_MISMATCH') {
+              await this.#client.disconnect(scope).catch(() => {});
+              if (latest?.scope.generation === scope.generation)
+                this.#apply(scope, { state: 'ERROR' }, 'NUMBER_MISMATCH');
+            }
+            if (
+              latest?.scope.generation === scope.generation &&
+              record.payload.operation !== 'send'
+            )
               this.#apply(scope, { state: 'ERROR' }, code);
           }
+          if (
+            result.state === 'CANCELED' &&
+            record.payload.operation !== 'send' &&
+            this.#store.latest(scope)?.scope.generation === scope.generation
+          )
+            this.#apply(scope, { state: 'ERROR' }, 'INSTANCE_REJECTED');
           this.#store.atomic(() => {
-            this.#store.finish(record.id, record.leaseToken, result);
+            if (!this.#store.finish(record.id, record.leaseToken, result))
+              throw new StoreError('STORAGE_LEASE_LOST');
+            if (record.payload.operation === 'send') {
+              this.#notifySend(record, result);
+              return;
+            }
             this.#store.markNotified(record.id);
             const current = this.#store.latest(scope);
             if (
@@ -279,6 +380,38 @@ export class ChannelEngine {
         }),
       ),
     );
+  }
+  #notifySend(record, result) {
+    const data = record.payload.data;
+    const status =
+      { DONE: 'SENT', FAILED: 'FAILED', UNKNOWN: 'UNKNOWN', CANCELED: 'CANCELED' }[result.state] ??
+      'UNKNOWN';
+    const known = new Set([
+      'OK',
+      'RESULT_UNKNOWN',
+      'CHANNEL_NOT_CONNECTED',
+      'COMMAND_EXPIRED',
+      'GENERATION_CHANGED',
+      'PROCESS_INTERRUPTED',
+    ]);
+    const code =
+      result.code === 'DISCONNECT_REQUESTED'
+        ? 'CHANNEL_NOT_CONNECTED'
+        : known.has(result.code)
+          ? result.code
+          : status === 'UNKNOWN'
+            ? 'RESULT_UNKNOWN'
+            : 'PROVIDER_REJECTED';
+    this.#store.enqueue(record.scope, 'event', 'send-result:' + record.id, {
+      type: 'sendResult',
+      messageId: data.messageId,
+      providerId: data.providerId,
+      peer: data.to,
+      status,
+      code,
+      occurredAt: this.#clock(),
+    });
+    this.#store.markNotified(record.id);
   }
   capture(raw, authorization) {
     if (

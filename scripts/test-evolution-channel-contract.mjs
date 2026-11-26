@@ -13,6 +13,8 @@ import {
   instanceEventToken,
 } from '../services/evolution-gateway/instance-client.mjs';
 import { PROBE_PATH } from '../services/evolution-gateway/protocol.mjs';
+import { outboundMessageId } from '../services/evolution-gateway/protocol.mjs';
+import { InstanceError } from '../services/evolution-gateway/instance-client.mjs';
 import { receiveEvolutionEvent } from '../src/modules/evolution/event-request.ts';
 import { processEvolutionEvent } from '../src/modules/evolution/events.ts';
 
@@ -146,6 +148,48 @@ try {
   const conversation = await db.conversation.findFirstOrThrow({ where: { accountId: account.id } });
   assert.equal(conversation.unreadCount, 1);
   assert.equal(conversation.automationPaused, false);
+  const outgoing = await db.message.create({
+    data: {
+      tenantId: tenant.id,
+      accountId: account.id,
+      conversationId: conversation.id,
+      direction: 'OUTBOUND',
+      status: 'SENDING',
+      type: 'text',
+      text: 'Respuesta MONZO',
+      channelGeneration: 1,
+      occurredAt: new Date(now),
+    },
+  });
+  const providerId = outboundMessageId(config.gatewayKey, tenant.id, account.id, outgoing.id);
+  await db.message.update({ where: { id: outgoing.id }, data: { providerId } });
+  client.sendText = async (s, data) => {
+    capture(
+      {
+        key: { id: data.providerId, remoteJid: data.to + '@s.whatsapp.net', fromMe: true },
+        message: { conversation: data.text },
+        messageTimestamp: Math.floor(now / 1000),
+      },
+      'send.message',
+      s,
+    );
+    throw new InstanceError('INSTANCE_RESULT_UNKNOWN', true);
+  };
+  engine.command({
+    scope,
+    commandId: 'message:' + outgoing.id,
+    operation: 'send',
+    deadline: now + 120000,
+    data: { messageId: outgoing.id, to: '15557654321', text: 'Respuesta MONZO', providerId },
+  });
+  await engine.drainCommands();
+  await relay();
+  assert.equal((await db.message.findUniqueOrThrow({ where: { id: outgoing.id } })).status, 'SENT');
+  assert.equal(await db.message.count({ where: { accountId: account.id } }), 2);
+  assert.equal(
+    (await db.conversation.findUniqueOrThrow({ where: { id: conversation.id } })).automationPaused,
+    false,
+  );
   const human = {
     ...incoming,
     key: { ...incoming.key, id: 'CONTRACT_HUMAN', fromMe: true },

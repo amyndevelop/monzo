@@ -83,3 +83,17 @@ export function eventProof(secret, id, digest, nonce) {
     throw new Error('INVALID_EVENT_ACK');
   return mac(secret, `${PROTOCOL}:event-ack\n${EVENT_PATH}\n${id}\n${digest}\n${nonce}`);
 }
+export function outboundMessageId(secret, tenantId, accountId, messageId) {
+  if (
+    ![tenantId, accountId, messageId].every(
+      (value) => typeof value === 'string' && /^[a-zA-Z0-9_-]{1,128}$/.test(value),
+    )
+  )
+    throw new Error('INVALID_MESSAGE_SCOPE');
+  return (
+    '3EB0' +
+    mac(secret, `${PROTOCOL}:outbound-message-id\n${tenantId}\n${accountId}\n${messageId}`)
+      .slice(0, 18)
+      .toUpperCase()
+  );
+}

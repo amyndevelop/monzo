@@ -66,7 +66,11 @@ export function createGateway(config, transport = fetch, engine = null) {
         if (!req.headers['content-type']?.startsWith('application/json'))
           throw new GatewayError('CONTENT_TYPE', 415);
         const length = req.headers['content-length'];
-        const bodyLimit = internal ? 1048576 : 2048;
+        const bodyLimit = internal
+          ? 1048576
+          : channels && req.url === '/v1/channels/command'
+            ? 32768
+            : 2048;
         if (length && (!/^\d+$/.test(length) || Number(length) > bodyLimit)) {
           req.resume();
           throw new GatewayError('BODY_LIMIT', 413);

@@ -16,6 +16,7 @@ import {
   eventDigest,
   eventProof,
   verifyEvent,
+  outboundMessageId,
 } from '../protocol.mjs';
 
 const key = () => randomBytes(32).toString('hex');
@@ -61,6 +62,10 @@ function fixture(t) {
       calls.push(['disconnect', s.generation]);
       states.set(instanceScope(s).name, { state: 'DISCONNECTED' });
       return { state: 'DISCONNECTED' };
+    },
+    async sendText(s, data) {
+      calls.push(['send', s.generation, data.providerId]);
+      return data.providerId;
     },
   };
   const openStore = () => new DurableStore({ directory, key: storageKey, clock: () => now });
@@ -371,4 +376,169 @@ test('configuración de canales: exige una clave de almacenamiento independiente
       .channelsEnabled,
     true,
   );
+});
+
+test('coordinador: otro propietario espera el cierre confirmado del mismo teléfono', async (t) => {
+  const f = fixture(t),
+    other = { ...scope, tenantId: 'other-tenant', accountId: 'other-account' };
+  f.engine.command(f.command());
+  await f.engine.drainCommands();
+  assert.throws(() => f.engine.command(f.command('connect', other)), /PHONE_IN_USE/);
+  f.engine.command(f.command('disconnect'));
+  assert.throws(() => f.engine.command(f.command('connect', other)), /PHONE_IN_USE/);
+  await f.engine.drainCommands();
+  assert.equal(f.engine.command(f.command('connect', other)).state, 'ACCEPTED');
+});
+
+function sendCommand(f, messageId = 'message-one') {
+  return {
+    ...f.command('send', scope, 'message:' + messageId),
+    data: {
+      messageId,
+      to: '15557654321',
+      text: 'Mensaje del fixture',
+      providerId: outboundMessageId(
+        f.config.gatewayKey,
+        scope.tenantId,
+        scope.accountId,
+        messageId,
+      ),
+    },
+  };
+}
+test('envío durable: un ID de MONZO produce un solo POST lógico y un resultado persistente', async (t) => {
+  const f = fixture(t);
+  f.engine.command(f.command());
+  await f.engine.drainCommands();
+  f.open();
+  await f.engine.poll();
+  const command = sendCommand(f);
+  assert.equal(f.engine.command(command).state, 'ACCEPTED');
+  assert.equal(
+    f.calls.some((c) => c[0] === 'send'),
+    false,
+  );
+  await f.engine.drainCommands();
+  assert.equal(f.calls.filter((c) => c[0] === 'send').length, 1);
+  f.reopen();
+  assert.equal(f.engine.command(command).state, 'DONE');
+  await f.engine.drainCommands();
+  assert.equal(f.calls.filter((c) => c[0] === 'send').length, 1);
+  for (let i = 0; i < 4; i++) await f.relay();
+  const result = f.deliveries.find((d) => d.payload.type === 'sendResult');
+  assert.equal(result.payload.status, 'SENT');
+  assert.equal(result.payload.providerId, command.data.providerId);
+  assert.equal(result.payload.text, undefined);
+});
+
+test('envío durable: timeout no se reintenta y el reinicio conserva UNKNOWN', async (t) => {
+  const f = fixture(t);
+  f.engine.command(f.command());
+  await f.engine.drainCommands();
+  f.open();
+  await f.engine.poll();
+  let sends = 0;
+  f.client.sendText = async () => {
+    sends++;
+    throw new InstanceError('INSTANCE_RESULT_UNKNOWN', true);
+  };
+  const command = sendCommand(f);
+  f.engine.command(command);
+  await f.engine.drainCommands();
+  assert.equal(f.engine.command(command).state, 'UNKNOWN');
+  f.reopen();
+  await f.engine.drainCommands();
+  assert.equal(f.engine.command(command).state, 'UNKNOWN');
+  assert.equal(sends, 1);
+  for (let i = 0; i < 4; i++) await f.relay();
+  assert.equal(f.deliveries.find((d) => d.payload.type === 'sendResult').payload.status, 'UNKNOWN');
+});
+
+test('envío durable: desconexión previa cancela sin enviar y rechaza IDs falsos o claves alternativas', async (t) => {
+  const f = fixture(t);
+  f.engine.command(f.command());
+  await f.engine.drainCommands();
+  f.open();
+  await f.engine.poll();
+  const command = sendCommand(f);
+  assert.throws(
+    () => f.engine.command({ ...command, commandId: 'another-key' }),
+    /INVALID_MESSAGE/,
+  );
+  assert.throws(
+    () =>
+      f.engine.command({
+        ...command,
+        data: { ...command.data, providerId: '3EB0' + 'A'.repeat(18) },
+      }),
+    /INVALID_MESSAGE/,
+  );
+  f.engine.command(command);
+  f.engine.command(f.command('disconnect'));
+  await f.engine.drainCommands();
+  assert.equal(
+    f.calls.some((c) => c[0] === 'send'),
+    false,
+  );
+  for (let i = 0; i < 4; i++) await f.relay();
+  assert.equal(
+    f.deliveries.find((d) => d.payload.type === 'sendResult').payload.status,
+    'CANCELED',
+  );
+});
+
+test('ID de envío: estable en reintentos y distinto por empresa, cuenta, mensaje y clave', () => {
+  const secret = key(),
+    id = outboundMessageId(secret, 'tenant', 'account', 'message');
+  assert.match(id, /^3EB0[A-F0-9]{18}$/);
+  assert.equal(outboundMessageId(secret, 'tenant', 'account', 'message'), id);
+  for (const change of [
+    [key(), 'tenant', 'account', 'message'],
+    [secret, 'other', 'account', 'message'],
+    [secret, 'tenant', 'other', 'message'],
+    [secret, 'tenant', 'account', 'other'],
+  ])
+    assert.notEqual(outboundMessageId(...change), id);
+  assert.throws(
+    () => outboundMessageId(secret, 'tenant\nother', 'account', 'message'),
+    /INVALID_MESSAGE_SCOPE/,
+  );
+});
+
+test('coordinador: repetir la solicitud no extiende el deadline aceptado originalmente', async (t) => {
+  const f = fixture(t),
+    command = f.command();
+  command.deadline -= 119999;
+  f.engine.command(command);
+  f.advance(2000);
+  assert.equal(
+    f.engine.command({ ...command, deadline: command.deadline + 120000 }).state,
+    'ACCEPTED',
+  );
+  await f.engine.drainCommands();
+  assert.equal(f.engine.command(command).state, 'CANCELED');
+  assert.equal(
+    f.calls.some((c) => c[0] === 'connect'),
+    false,
+  );
+});
+
+test('envío durable: si cambia la identidad se cierra la sesión y no se envía al proveedor', async (t) => {
+  const f = fixture(t);
+  f.engine.command(f.command());
+  await f.engine.drainCommands();
+  f.open();
+  await f.engine.poll();
+  f.engine.command(sendCommand(f));
+  f.open(scope, '15559999999');
+  await f.engine.drainCommands();
+  assert.equal(
+    f.calls.some((c) => c[0] === 'send'),
+    false,
+  );
+  assert.equal(
+    f.calls.some((c) => c[0] === 'disconnect'),
+    true,
+  );
+  assert.equal(f.engine.status(scope).lastErrorCode, 'NUMBER_MISMATCH');
 });

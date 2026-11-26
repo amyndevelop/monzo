@@ -17,6 +17,27 @@ const verified = { verifiedPhone: phone, verifiedAt: milliseconds };
 export const evolutionPayloadSchema = z.discriminatedUnion('type', [
   z
     .object({
+      type: z.literal('sendResult'),
+      messageId: identity,
+      providerId: z.string().regex(/^3EB0[A-F0-9]{18}$/),
+      peer: phone,
+      status: z.enum(['SENT', 'FAILED', 'UNKNOWN', 'CANCELED']),
+      occurredAt: milliseconds,
+      code: z
+        .enum([
+          'OK',
+          'RESULT_UNKNOWN',
+          'PROVIDER_REJECTED',
+          'CHANNEL_NOT_CONNECTED',
+          'COMMAND_EXPIRED',
+          'GENERATION_CHANGED',
+          'PROCESS_INTERRUPTED',
+        ])
+        .optional(),
+    })
+    .strict(),
+  z
+    .object({
       type: z.literal('connection'),
       state: z.enum(['DISCONNECTED', 'CONNECTING', 'QR', 'CONNECTED', 'DISCONNECTING', 'ERROR']),
       observedAt: milliseconds,

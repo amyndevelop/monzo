@@ -215,5 +215,38 @@ export function instanceClient(config, transport = fetch) {
       if (after?.state === 'CONNECTED') throw new InstanceError('INSTANCE_DISCONNECT_PENDING');
       return after ?? { state: 'NOT_CREATED' };
     },
+    async sendText(input, data) {
+      const scope = instanceScope(input);
+      if (
+        !data ||
+        typeof data !== 'object' ||
+        Array.isArray(data) ||
+        Object.keys(data).sort().join(',') !== 'providerId,text,to' ||
+        typeof data.to !== 'string' ||
+        !/^[1-9][0-9]{5,14}$/.test(data.to) ||
+        data.to === scope.expectedPhone ||
+        typeof data.text !== 'string' ||
+        !data.text.trim() ||
+        data.text.length > 4096 ||
+        typeof data.providerId !== 'string' ||
+        !/^3EB0[A-F0-9]{18}$/.test(data.providerId)
+      )
+        throw new InstanceError('INVALID_MESSAGE');
+      const connected = await lookup(scope);
+      if (connected?.state !== 'CONNECTED') throw new InstanceError('CHANNEL_NOT_CONNECTED');
+      const sent = await request('/message/sendText/' + scope.name, 'POST', {
+        number: data.to,
+        text: data.text,
+        linkPreview: false,
+        monzoMessageId: data.providerId,
+      });
+      const peer =
+        typeof sent?.key?.remoteJid === 'string'
+          ? /^([1-9][0-9]{5,14})(?::[0-9]{1,4})?@s\.whatsapp\.net$/.exec(sent.key.remoteJid)?.[1]
+          : null;
+      if (sent?.key?.id !== data.providerId || sent.key.fromMe !== true || peer !== data.to)
+        throw new InstanceError('INSTANCE_RESULT_UNKNOWN', true);
+      return data.providerId;
+    },
   };
 }

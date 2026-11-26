@@ -465,3 +465,56 @@ test('receptor HTTP MONZO: limita bytes y rechaza JSON, campos o firma inválido
   assert.equal(called, false);
   assert.equal(await db.evolutionDelivery.count({ where: { accountId: f.account.id } }), 0);
 });
+
+test('eventos MONZO: resultados de envío revalidan destino/generación y no retroceden un envío confirmado', async (t) => {
+  const f = await fixture(t);
+  await f.process(f.incoming());
+  const conversation = await db.conversation.findFirstOrThrow({
+    where: { accountId: f.account.id },
+  });
+  const providerId = '3EB0' + 'C'.repeat(18);
+  const message = await db.message.create({
+    data: {
+      tenantId: f.tenant.id,
+      accountId: f.account.id,
+      conversationId: conversation.id,
+      direction: 'OUTBOUND',
+      status: 'UNKNOWN',
+      type: 'text',
+      text: 'Mensaje',
+      channelGeneration: 1,
+      providerId,
+      occurredAt: new Date(now),
+    },
+  });
+  const payload = {
+    type: 'sendResult' as const,
+    messageId: message.id,
+    providerId,
+    peer: '15557654321',
+    status: 'SENT' as const,
+    occurredAt: now,
+    code: 'OK' as const,
+  };
+  await f.process(f.event({ ...payload, peer: '15550000000' }));
+  assert.equal(
+    (await db.message.findUniqueOrThrow({ where: { id: message.id } })).status,
+    'UNKNOWN',
+  );
+  await f.process(f.event(payload));
+  for (const status of ['UNKNOWN', 'FAILED', 'CANCELED'] as const)
+    await f.process(f.event({ ...payload, status, code: 'RESULT_UNKNOWN' }));
+  assert.equal((await db.message.findUniqueOrThrow({ where: { id: message.id } })).status, 'SENT');
+  await db.message.update({ where: { id: message.id }, data: { status: 'UNKNOWN' } });
+  await db.evolutionSession.update({
+    where: { accountId: f.account.id },
+    data: { generation: 2, state: 'DISCONNECTED', desiredState: 'DISCONNECTED' },
+  });
+  await f.process(f.event(payload));
+  assert.equal((await db.message.findUniqueOrThrow({ where: { id: message.id } })).status, 'SENT');
+  const session = await db.evolutionSession.findUniqueOrThrow({
+    where: { accountId: f.account.id },
+  });
+  assert.equal(session.generation, 2);
+  assert.equal(session.state, 'DISCONNECTED');
+});

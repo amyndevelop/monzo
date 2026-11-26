@@ -59,6 +59,37 @@ export async function processEvolutionEvent(
       const currentGeneration = scope.generation === session.generation;
       const freshSequence = BigInt(event.sequence) > session.lastEventSequence;
 
+      if (payload.type === 'sendResult') {
+        if (payload.occurredAt > now + 60000) throw new EvolutionEventError('EVENT_TIME', 400);
+        const sent = await tx.message.findFirst({
+          where: {
+            id: payload.messageId,
+            tenantId: scope.tenantId,
+            accountId: scope.accountId,
+            direction: 'OUTBOUND',
+            providerId: payload.providerId,
+            channelGeneration: scope.generation,
+          },
+          include: { conversation: { include: { contact: true } } },
+        });
+        if (
+          sent &&
+          sent.conversation.contact.waId === payload.peer &&
+          sent.status !== 'CANCELED' &&
+          (payload.status === 'SENT'
+            ? !statusRank[sent.status]
+            : ['SENDING', 'UNKNOWN'].includes(sent.status))
+        )
+          await tx.message.update({
+            where: { id: sent.id },
+            data: {
+              status: payload.status,
+              errorCode:
+                payload.status === 'SENT' ? null : 'EVOLUTION_' + (payload.code ?? payload.status),
+            },
+          });
+      }
+
       if (payload.type === 'connection' && currentGeneration && freshSequence) {
         if (payload.observedAt > now + 60000) throw new EvolutionEventError('EVENT_TIME', 400);
         let state = payload.state,

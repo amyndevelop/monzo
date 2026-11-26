@@ -23,6 +23,8 @@ async function rig(t) {
     qr: 'qr-test-fixture-never-used-with-whatsapp',
     foreignName: null,
     createStatus: 201,
+    sendStatus: 201,
+    sendIdMismatch: false,
   };
   const name = instanceScope(scope).name;
   const server = createServer(async (req, res) => {
@@ -81,6 +83,21 @@ async function rig(t) {
       state.connection = 'close';
       return res.end('{}');
     }
+    if (url.pathname === '/message/sendText/' + name) {
+      assert.equal(req.method, 'POST');
+      res.statusCode = state.sendStatus;
+      return res.end(
+        JSON.stringify({
+          key: {
+            id: state.sendIdMismatch ? 'UNEXPECTED' : body.monzoMessageId,
+            fromMe: true,
+            remoteJid: body.number + '@s.whatsapp.net',
+          },
+          message: { conversation: body.text },
+          token: secrets.upstream,
+        }),
+      );
+    }
     res.statusCode = 404;
     res.end('{}');
   });
@@ -102,6 +119,53 @@ async function rig(t) {
   });
   return { client: instanceClient(config), config, calls, state, secrets };
 }
+
+test('envío HTTP controlado: verifica identidad, usa ID previo y devuelve solo ese ID', async (t) => {
+  const r = await rig(t);
+  r.state.exists = true;
+  r.state.connection = 'open';
+  const data = { to: '15557654321', text: 'Texto de prueba', providerId: '3EB0' + 'A'.repeat(18) };
+  assert.equal(await r.client.sendText(scope, data), data.providerId);
+  const call = r.calls.find((c) => c.path.startsWith('/message/sendText/'));
+  assert.deepEqual(call.body, {
+    number: data.to,
+    text: data.text,
+    linkPreview: false,
+    monzoMessageId: data.providerId,
+  });
+  const before = r.calls.length;
+  await assert.rejects(
+    () => r.client.sendText(scope, { ...data, to: scope.expectedPhone }),
+    /INVALID_MESSAGE/,
+  );
+  assert.equal(r.calls.length, before);
+  r.state.owner = '15559999999@s.whatsapp.net';
+  await assert.rejects(() => r.client.sendText(scope, data), /NUMBER_MISMATCH/);
+  assert.equal(r.calls.filter((c) => c.path.startsWith('/message/sendText/')).length, 1);
+});
+
+test('envío HTTP controlado: respuesta perdida o ID inesperado queda incierto sin repetir POST', async (t) => {
+  const r = await rig(t);
+  r.state.exists = true;
+  r.state.connection = 'open';
+  const data = { to: '15557654321', text: 'Texto de prueba', providerId: '3EB0' + 'B'.repeat(18) };
+  r.state.sendIdMismatch = true;
+  await assert.rejects(
+    () => r.client.sendText(scope, data),
+    (e) => e.code === 'INSTANCE_RESULT_UNKNOWN' && e.uncertain,
+  );
+  assert.equal(r.calls.filter((c) => c.path.startsWith('/message/sendText/')).length, 1);
+  r.state.sendIdMismatch = false;
+  r.state.sendStatus = 500;
+  await assert.rejects(
+    () => r.client.sendText(scope, data),
+    (e) => e.code === 'INSTANCE_RESULT_UNKNOWN' && e.uncertain,
+  );
+  assert.equal(r.calls.filter((c) => c.path.startsWith('/message/sendText/')).length, 2);
+  r.state.connection = 'close';
+  await assert.rejects(() => r.client.sendText(scope, data), /CHANNEL_NOT_CONNECTED/);
+  assert.equal(r.calls.filter((c) => c.path.startsWith('/message/sendText/')).length, 2);
+});
 
 test('instancias: nombres estables separados por empresa, cuenta y generación; sin teléfonos ni rutas arbitrarias', () => {
   const name = instanceScope(scope).name;
