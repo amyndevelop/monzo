@@ -1,10 +1,10 @@
 # Evolution · Etapa 3: QR y conversaciones
 
-Estado al 26/11/2026: desarrollo iniciado en **feat/evolution-conversations**, desde `4f78ceb`. La Etapa 2 ya verificó la conexión técnica del VPS con el Preview de `feat/evolution-integration`. Esta rama nueva todavía no ofrece vinculación Evolution desde Canales, no modifica el stack desplegado ni el esquema de MONZO y no habilita números.
+Estado al 26/11/2026: desarrollo en **feat/evolution-conversations**, desde `4f78ceb`. El usuario ya accede al Preview con sesión verificada y empresa de pruebas creada. Hay adaptador de instancias, journal cifrado y una migración preparada para la base de pruebas. Todavía no ofrece vinculación Evolution desde Canales ni habilita números. El VPS conserva su stack y retorno de diagnóstico de Etapa 2; la migración nueva de Neon no se declara aplicada hasta recibir su resultado.
 
 ## Entorno de pruebas
 
-La base independiente de Neon ya quedó preparada y verificada, pero **su asignación al Preview sigue pendiente**. El usuario inicialmente no sabía qué base usaba ese despliegue; no iniciar sesión para probar escrituras, migrar ni conectar un número allí hasta comprobar su conexión a la nueva base. El desarrollo y las pruebas de proveedor se ejecutan localmente con servidores controlados. No usar las credenciales, cola, sesiones ni eventos de producción para probar el nuevo proveedor.
+La base independiente **monzo-evolution-test / neondb** quedó preparada con once migraciones; el usuario cargó su DATABASE_URL en Preview, completó las claves de acceso y SMTP, registró su cuenta y creó BOISTIFY. La captura confirma acceso y sesión verificada en el alias de Etapa 3. No se inspeccionaron los valores privados de Vercel ni se conectó un número. Las pruebas de proveedor se ejecutan localmente con servidores controlados. No usar las credenciales, cola, sesiones ni eventos de producción para probar el nuevo proveedor. Los párrafos siguientes conservan el recorrido de preparación y sus resultados sucesivos.
 
 El usuario creó en Neon una rama **monzo-evolution-test**, desde `main`, seleccionando **Branch schema only**. Su estructura e historial quedaron comprobados con el baseline descrito abajo; todavía no está vinculada a Vercel. Para inspeccionar una copia nueva, en SQL Editor seleccionar explícitamente esa rama y ejecutar [la consulta de solo lectura](sql/evolution-preview-inspect.sql). Se esperan tablas públicas presentes y cero usuarios, empresas, canales, contactos, conversaciones y mensajes. El contador de `_prisma_migrations` puede ser cero antes del baseline porque el historial también es una tabla de datos: no ejecutar `prisma migrate deploy` sobre una copia de esquema sin revisar primero ese historial y comprobar que coincide con las migraciones del repositorio. La consulta usa una transacción de solo lectura y no inicializa historial ni cambia datos. Si la estructura no corresponde o aparece alguna fila de aplicación, detener el alta del Preview y revisar la rama elegida.
 
@@ -97,10 +97,29 @@ Este módulo todavía **no está registrado en main/server, copiado a la imagen 
 
 Validación: 47 pruebas locales de probe/gateway/instancias/setup/spool pasaron. Las once del spool incluyen recuperación después de un **SIGKILL real** de un proceso de prueba, no reenvío de comandos inciertos, orden, aislamiento, fencing, rollback, límites, retención, clave incorrecta y alteración del ciphertext. Esas mismas once pasaron dentro de la imagen Node fijada, sin red, raíz de solo lectura, almacenamiento temporal, usuario sin privilegios y límite de memoria de 128 MiB. Ninguna usó archivos reales del VPS ni contactó WhatsApp.
 
+## Actualización de la base de pruebas para Evolution
+
+[evolution-preview-upgrade.sql](sql/evolution-preview-upgrade.sql) aplica `202611260001_evolution_channels` únicamente sobre el baseline de pruebas ya preparado. Agrega EvolutionSession (teléfono esperado, estado, QR cifrado y generación), EvolutionDelivery (confirmaciones de eventos deduplicadas) y Message.channelGeneration nullable para distinguir mensajes de conexiones anteriores. Amplía el CHECK de proveedores sin modificar cuentas, credenciales ni mensajes anteriores. No conecta teléfonos ni activa el canal.
+
+El bloque comprueba nombre de base, once migraciones y sus checksums, huella estructural completa y los IDs deterministas del baseline de Preview. **Rechaza el historial original de producción**, aunque su esquema coincida. La operación es atómica, conserva las filas actuales y se puede repetir: si ya existen las doce migraciones compatibles, no escribe. Una copia que contenga esos mismos marcadores también puede cumplir la comprobación; el operador debe mantener seleccionada la rama correcta de Neon.
+
+El usuario debe abrir SQL Editor con **monzo-evolution-test / neondb**, crear una consulta nueva, pegar el archivo completo y ejecutar Run. La fila final muestra base, migraciones, tabla_conexion, tabla_eventos, columna_generacion, usuarios y empresas. Se esperan `neondb | 12 | 1 | 1 | 1`; los dos últimos contadores conservan las cuentas/empresas que ya haya registrado. Compartir únicamente esa fila, no cadenas de conexión ni claves. No ejecutar este archivo en `main` ni volver a aplicar el baseline vacío sobre la base que ahora tiene datos.
+
+El SQL se genera desde las migraciones originales en bases temporales locales. Las pruebas de PostgreSQL 17 y **PostgreSQL 18 real** pasaron: esquema/checksums exactos, conservación de usuario/empresa/canal Meta/contacto/conversación/mensaje y credencial de fixture, rollback después del DDL, repetición sin cambios, rechazo de historial original de producción y deriva. También se comprueban las restricciones de teléfono activo, identidad, generación, deduplicación y claves compuestas entre empresas. El test de PostgreSQL 18 espera por TCP al servidor definitivo para evitar confundirlo con el servidor transitorio de inicialización de la imagen. Ninguna prueba contacta Neon ni usa datos reales.
+
+```bash
+node scripts/prepare-evolution-preview-upgrade.mjs
+node scripts/test-evolution-preview-upgrade.mjs
+node scripts/test-evolution-preview-baseline.mjs
+node scripts/test-evolution-preview-postgres18.mjs
+```
+
+Orden de publicación: primero SQL, migración y herramientas, conservando el modelo Prisma desplegado de once migraciones. **La incorporación de los campos nuevos al cliente Prisma queda para después de confirmar la ejecución en Neon**, porque un campo escalar de Message se incluye en consultas existentes aun si no se habilita Evolution. El build de Vercel no aplica migraciones automáticamente. No cambiar Production, reiniciar el stack del VPS ni cambiar su destino por este paso.
+
 ## Integración pendiente
 
 1. Integrar el journal durable con comandos, eventos y generaciones del gateway; completar firma/confirmación del retorno, despacho y límites. Definir almacenamiento de adjuntos privado y acotado antes de habilitarlos.
-2. Modelo/migración de cuentas Evolution sin reutilizar credenciales de Meta ni la sesión del worker Baileys existente. Las rutas y workers deben seleccionar el proveedor explícitamente.
+2. Aplicar en la rama Neon de pruebas la migración preparada y publicar después su modelo Prisma junto a las rutas que lo usan. Las rutas y workers deben seleccionar el proveedor explícitamente, sin reutilizar credenciales de Meta ni la sesión del worker Baileys existente.
 3. Canales: preparación del teléfono por propietario, escaneo/renovación/caducidad, identidad comprobada, conexión/desconexión y recuperación. QR oculto a miembros sin permiso; abortar solicitudes al cambiar de empresa; confirmación real antes de anunciar Conectado.
 4. Conversaciones: recepción/envío, recibos fuera de orden, duplicados, mensajes desde el teléfono, pausa del bot ante intervención humana y recuperación de resultado incierto. Integrar adjuntos e historial acotado con límites explícitos y conservación del compositor/borradores.
 5. Persistencia/recuperación real de sesión, backups cifrados y restauración en aislamiento, dos empresas y permisos cruzados, móvil/escritorio/teclado. El número secundario solo se conecta cuando la integración durable esté completa.

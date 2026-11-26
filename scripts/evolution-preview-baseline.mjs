@@ -5,6 +5,9 @@ export function baselineMigrations() {
   const names = readdirSync('prisma/migrations')
     .filter((name) => /^\d{12}_/.test(name))
     .sort();
+  // The initial schema-only copy is still the eleven-migration baseline. Its next
+  // reviewed migration is applied separately, never marked as already present.
+  if (names.length === 12 && names.at(-1) === '202611260001_evolution_channels') names.pop();
   if (names.length !== 11 || names.at(-1) !== '202611050001_whatsapp_qr')
     throw new Error('Review the schema-only baseline before including another migration.');
   return names.map((name) => {
@@ -50,6 +53,16 @@ export const migrationTableSql = `CREATE TABLE public._prisma_migrations (
  applied_steps_count INTEGER NOT NULL DEFAULT 0
 );`;
 
+export const notNullValidationSql = ` IF EXISTS (
+  SELECT 1 FROM pg_constraint k JOIN pg_class c ON c.oid=k.conrelid JOIN pg_namespace n ON n.oid=c.relnamespace
+  LEFT JOIN pg_attribute a ON a.attrelid=c.oid AND a.attnum=k.conkey[1]
+  WHERE n.nspname='public' AND k.contype='n' AND (
+   NOT k.convalidated OR k.condeferrable OR k.condeferred OR
+   to_jsonb(k)->>'conenforced' IS DISTINCT FROM 'true' OR
+   cardinality(k.conkey) IS DISTINCT FROM 1 OR NOT COALESCE(a.attnotnull,false)
+  )
+ ) THEN RAISE EXCEPTION 'MONZO: restricciones NOT NULL sin validar o incompatibles. No se registro historial.'; END IF;`;
+
 export function baselineSql(migrations, fingerprint, database = 'neondb') {
   if (
     !/^[a-z][a-z0-9_]{0,62}$/.test(database) ||
@@ -83,15 +96,7 @@ BEGIN
  FOR table_row IN SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind IN ('r','p') ORDER BY c.relname COLLATE "C" LOOP
   EXECUTE format('LOCK TABLE public.%I IN SHARE ROW EXCLUSIVE MODE',table_row.relname);
  END LOOP;
- IF EXISTS (
-  SELECT 1 FROM pg_constraint k JOIN pg_class c ON c.oid=k.conrelid JOIN pg_namespace n ON n.oid=c.relnamespace
-  LEFT JOIN pg_attribute a ON a.attrelid=c.oid AND a.attnum=k.conkey[1]
-  WHERE n.nspname='public' AND k.contype='n' AND (
-   NOT k.convalidated OR k.condeferrable OR k.condeferred OR
-   to_jsonb(k)->>'conenforced' IS DISTINCT FROM 'true' OR
-   cardinality(k.conkey) IS DISTINCT FROM 1 OR NOT COALESCE(a.attnotnull,false)
-  )
- ) THEN RAISE EXCEPTION 'MONZO: restricciones NOT NULL sin validar o incompatibles. No se registro historial.'; END IF;
+${notNullValidationSql}
  ${fingerprintSql.replace('SELECT jsonb_object_agg(kind,digest)', 'SELECT jsonb_object_agg(kind,digest) INTO actual_fingerprint')};
  IF actual_fingerprint IS DISTINCT FROM '${expected}'::jsonb THEN
   SELECT string_agg(key,', ' ORDER BY key) INTO different_sections FROM jsonb_object_keys(COALESCE(actual_fingerprint,'{}'::jsonb)||'${expected}'::jsonb) AS k(key)

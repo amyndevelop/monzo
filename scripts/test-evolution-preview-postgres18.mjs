@@ -9,6 +9,7 @@ import {
   fingerprintSql,
   migrationTableSql,
 } from './evolution-preview-baseline.mjs';
+import { evolutionMigration, evolutionUpgradeSql } from './evolution-preview-upgrade.mjs';
 
 // Test-only image. This never changes the Compose image, network or existing databases.
 const image = 'postgres@sha256:0115267ab5a509022df9319c77be365cef335adb71556c75f60f5360ee247e71';
@@ -75,7 +76,9 @@ try {
   let ready = false;
   for (let i = 0; i < 100; i++) {
     try {
-      docker(['exec', container, 'pg_isready', '-U', 'monzo', '-d', 'neondb']);
+      // The image's init server exposes only its Unix socket and is stopped
+      // before the final server starts. TCP readiness excludes that brief phase.
+      docker(['exec', container, 'pg_isready', '-h', '127.0.0.1', '-U', 'monzo', '-d', 'neondb']);
       ready = true;
       break;
     } catch {}
@@ -147,8 +150,45 @@ try {
     history,
   );
   assert.equal(artifact, baselineSql(migrations, expected));
+  const upgrade = readFileSync('docs/sql/evolution-preview-upgrade.sql', 'utf8');
+  // Preview now contains a newly registered user and company: the upgrade must
+  // preserve both, and must keep PostgreSQL 18's extra NOT NULL catalog entries.
+  query(`INSERT INTO "User"(id,email,"emailVerified","updatedAt") VALUES ('pg18-user','pg18@example.invalid',true,now());
+    INSERT INTO "Tenant"(id,name,slug,"updatedAt") VALUES ('pg18-tenant','Prueba','pg18-tenant',now());`);
+  const accounts = query(
+    'SELECT row_to_json(t) FROM "User" t; SELECT row_to_json(t) FROM "Tenant" t;',
+  );
+  const rollback = upgrade.replace(
+    ' INSERT INTO public._prisma_migrations(id,checksum,finished_at,migration_name,applied_steps_count)',
+    " RAISE EXCEPTION 'forced-pg18-upgrade-rollback'; INSERT INTO public._prisma_migrations(id,checksum,finished_at,migration_name,applied_steps_count)",
+  );
+  assert.notEqual(rollback, upgrade);
+  rejected(rollback, /forced-pg18-upgrade-rollback/);
+  assert.equal(query('SELECT count(*) FROM _prisma_migrations;'), '11');
+  assert.deepEqual(JSON.parse(query(fingerprintSql + ';')), expected);
+  assert.equal(query(upgrade), 'neondb|12|1|1|1|1|1');
+  const upgradedFingerprint = JSON.parse(query(fingerprintSql + ';'));
+  assert.equal(upgrade, evolutionUpgradeSql(migrations, expected, upgradedFingerprint));
+  assert.equal(
+    query(
+      `SELECT checksum FROM _prisma_migrations WHERE migration_name='${evolutionMigration().name}';`,
+    ),
+    evolutionMigration().checksum,
+  );
+  const upgradedHistory = query(
+    'SELECT row_to_json(h) FROM _prisma_migrations h ORDER BY migration_name;',
+  );
+  assert.equal(query(upgrade), 'neondb|12|1|1|1|1|1');
+  assert.equal(
+    query('SELECT row_to_json(h) FROM _prisma_migrations h ORDER BY migration_name;'),
+    upgradedHistory,
+  );
+  assert.equal(
+    query('SELECT row_to_json(t) FROM "User" t; SELECT row_to_json(t) FROM "Tenant" t;'),
+    accounts,
+  );
   console.log(
-    `PostgreSQL 18 real comprobado: ${notNulls} NOT NULL catalogados, estructura compatible, nulabilidad y CHECK exigidos, NOT VALID rechazado, once checksums e idempotencia. Contenedor temporal sin red ni volumen persistente.`,
+    `PostgreSQL 18 real comprobado: ${notNulls} NOT NULL iniciales, baseline y upgrade Evolution compatibles, doce checksums, rollback, idempotencia y cuentas preservadas. Contenedor temporal sin red ni volumen persistente.`,
   );
 } finally {
   if (container) docker(['rm', '--force', container]);
