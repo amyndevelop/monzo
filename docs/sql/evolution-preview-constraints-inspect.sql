@@ -1,8 +1,6 @@
 -- Solo lectura: ejecutar en monzo-evolution-test / neondb.
 -- Distingue el catalogo NOT NULL de PostgreSQL 18 de las demas restricciones.
 -- No modifica restricciones ni registra migraciones.
-BEGIN READ ONLY;
-SET LOCAL search_path = public, pg_catalog;
 WITH items AS (
  SELECT jsonb_build_array(
   c.relname,k.conname,k.contype,k.convalidated,
@@ -25,4 +23,3 @@ SELECT
  digest='c4d69c411b3b903aff18f9ae3c7d467e66ba599a0ab1c452d24d57236e19e214'
   AS otras_restricciones_coinciden
 FROM actual;
-COMMIT;
