@@ -28,6 +28,8 @@ export function readConfig(env) {
     vercelBypassSecret: env.VERCEL_AUTOMATION_BYPASS_SECRET ?? '',
     version: '2.3.8',
     port: Number(env.PORT ?? 9080),
+    channelsEnabled: env.EVOLUTION_CHANNELS_ENABLED === 'true',
+    storageKey: env.EVOLUTION_STORAGE_KEY ?? '',
   };
   if (
     ![config.apiKey, config.gatewayKey, config.webhookSecret].every((value) =>
@@ -81,6 +83,16 @@ export function readConfig(env) {
     throw new GatewayError('CONFIG_VERCEL_AUTH', 503);
   if (!Number.isInteger(config.port) || config.port < 1024 || config.port > 65535)
     throw new GatewayError('CONFIG_PORT', 503);
+  if (env.EVOLUTION_CHANNELS_ENABLED && !['true', 'false'].includes(env.EVOLUTION_CHANNELS_ENABLED))
+    throw new GatewayError('CONFIG_CHANNELS', 503);
+  if (
+    config.channelsEnabled &&
+    (!secretPattern.test(config.storageKey) ||
+      [config.apiKey, config.gatewayKey, config.webhookSecret, config.vercelBypassSecret].includes(
+        config.storageKey,
+      ))
+  )
+    throw new GatewayError('CONFIG_STORAGE_KEY', 503);
   return { ...config, evolutionOrigin: origin.origin, callbackUrl: callback.href };
 }
 export async function readJson(response, maximum = 16384) {

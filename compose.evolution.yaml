@@ -107,7 +107,7 @@ services:
       timeout: 5s
       retries: 10
   evolution-gateway:
-    image: monzo-evolution-gateway:0.1.0
+    image: monzo-evolution-gateway:0.2.0
     build: { context: services/evolution-gateway }
     restart: unless-stopped
     init: true
@@ -119,12 +119,15 @@ services:
       EVOLUTION_API_KEY: ${EVOLUTION_API_KEY}
       EVOLUTION_GATEWAY_KEY: ${EVOLUTION_GATEWAY_KEY:?Run the Evolution setup script first}
       EVOLUTION_WEBHOOK_SECRET: ${EVOLUTION_WEBHOOK_SECRET:?Run the Evolution setup script first}
+      EVOLUTION_CHANNELS_ENABLED: ${EVOLUTION_CHANNELS_ENABLED:-false}
+      EVOLUTION_STORAGE_KEY: ${EVOLUTION_STORAGE_KEY:-}
       MONZO_CALLBACK_URL: ${MONZO_ORIGIN}/api/integrations/evolution/probe
       VERCEL_AUTOMATION_BYPASS_SECRET: ${VERCEL_AUTOMATION_BYPASS_SECRET:-}
       NODE_USE_ENV_PROXY: '1'
       NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1},evolution,evolution-db,evolution-redis
       no_proxy: ${NO_PROXY:-localhost,127.0.0.1},evolution,evolution-db,evolution-redis
     ports: ['127.0.0.1:${EVOLUTION_GATEWAY_PORT:-18085}:9080']
+    volumes: [evolution_gateway_state:/state]
     networks: [backplane, egress]
     read_only: true
     tmpfs: ['/tmp:size=32m,mode=1777']
@@ -141,3 +144,4 @@ volumes:
   evolution_database: {}
   evolution_cache: {}
   evolution_instances: {}
+  evolution_gateway_state: {}

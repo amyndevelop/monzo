@@ -317,3 +317,30 @@ test('relay: cuenta bloqueada conserva orden; otra avanza; ACK previo no sirve p
   assert.equal((await relayEvents(f.store, f.config, { clock: f.clock }))[0].acknowledged, true);
   assert.equal((await relayEvents(f.store, f.config, { clock: f.clock }))[0].id, second.id);
 });
+
+test('relay: prepara identidad una vez y no cambia el cuerpo tras una respuesta perdida', async (t) => {
+  const f = await fixture(t),
+    event = f.enqueue('candidate', { candidate: { text: 'fixture' } });
+  let calls = 0;
+  const options = {
+    clock: f.clock,
+    prepare: async (record) => {
+      calls++;
+      return f.store.prepareEvent(record.id, record.leaseToken, {
+        type: 'message',
+        verifiedAt: f.clock(),
+        text: 'fixture',
+      });
+    },
+  };
+  f.behavior.mode = 'lost-response';
+  assert.equal((await relayEvents(f.store, f.config, options))[0].acknowledged, false);
+  assert.equal(calls, 1);
+  f.reopen();
+  f.advance(1000);
+  f.behavior.mode = 'ok';
+  assert.equal((await relayEvents(f.store, f.config, options))[0].acknowledged, true);
+  assert.equal(calls, 1);
+  assert.equal(f.received[0].raw.toString(), f.received[1].raw.toString());
+  assert.equal(f.store.record(scope, 'event', 'candidate').id, event.id);
+});

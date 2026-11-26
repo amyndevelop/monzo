@@ -41,6 +41,13 @@ export function instanceScope(input) {
   return { ...input, name: `monzo_${digest}_${input.generation}` };
 }
 
+export function instanceEventToken(config, input) {
+  const scope = instanceScope(input);
+  return createHmac('sha256', Buffer.from(config.apiKey, 'hex'))
+    .update(`monzo-evolution-event-token-v1\n${scope.name}`)
+    .digest('hex');
+}
+
 function statusFor(data, scope) {
   if (
     !data ||

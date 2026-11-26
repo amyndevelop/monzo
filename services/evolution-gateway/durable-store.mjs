@@ -118,7 +118,7 @@ export class DurableStore {
       });
       this.#db.exec('PRAGMA busy_timeout=2000;');
       const version = this.#db.prepare('PRAGMA user_version').get().user_version;
-      if (version !== 0 && version !== 1) throw new StoreError('STORAGE_VERSION');
+      if (![0, 1, 2].includes(version)) throw new StoreError('STORAGE_VERSION');
       if (version === 0) {
         if (
           this.#db
@@ -153,6 +153,16 @@ export class DurableStore {
       this.#db.exec(
         `PRAGMA locking_mode=EXCLUSIVE; BEGIN EXCLUSIVE; COMMIT; PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA wal_autocheckpoint=256; PRAGMA cache_size=-4096; PRAGMA max_page_count=${maxPages};`,
       );
+      if (version < 2)
+        this.atomic(() => {
+          // Keep the last verified state of retired instances for delayed receipts
+          // and for explicit cleanup before a replacement generation connects.
+          this.#db
+            .exec(`CREATE TABLE instances(instance TEXT PRIMARY KEY,owner TEXT NOT NULL,generation INTEGER NOT NULL,payload BLOB NOT NULL,updated_at INTEGER NOT NULL,
+          UNIQUE(owner,generation), FOREIGN KEY(owner) REFERENCES accounts(owner));
+          INSERT INTO instances(instance,owner,generation,payload,updated_at) SELECT instance,owner,generation,payload,updated_at FROM accounts;
+          PRAGMA user_version=2;`);
+        });
       this.atomic(() => {
         const interrupted = this.#db
           .prepare("SELECT * FROM journal WHERE kind='command' AND state='PROCESSING'")
@@ -284,6 +294,11 @@ export class DurableStore {
         if (previous.scope.generation > scope.generation) throw new StoreError('STALE_GENERATION');
         if (previous.scope.generation === scope.generation) return previous;
       }
+      if (
+        this.#db.prepare('SELECT count(*) AS count FROM instances WHERE owner=?').get(owner)
+          .count >= 1000
+      )
+        throw new StoreError('STORAGE_FULL');
       const stale = this.#db
         .prepare(
           "SELECT * FROM journal WHERE owner=? AND generation<? AND kind='command' AND state='PENDING'",
@@ -303,25 +318,62 @@ export class DurableStore {
           'INSERT INTO accounts(owner,generation,instance,payload,updated_at) VALUES (?,?,?,?,?) ON CONFLICT(owner) DO UPDATE SET generation=excluded.generation,instance=excluded.instance,payload=excluded.payload,updated_at=excluded.updated_at',
         )
         .run(owner, scope.generation, name, this.#seal('account', owner, record), this.#clock());
+      this.#db
+        .prepare(
+          'INSERT INTO instances(instance,owner,generation,payload,updated_at) VALUES (?,?,?,?,?)',
+        )
+        .run(name, owner, scope.generation, this.#seal('account', owner, record), this.#clock());
       return record;
     });
   }
   account(input) {
+    const { scope } = scoped(input);
+    const record = this.latest(scope);
+    if (!record || record.scope.generation !== scope.generation)
+      throw new StoreError('STALE_GENERATION');
+    return record;
+  }
+  latest(input) {
     const { scope, owner } = scoped(input);
     const record = this.#account(
       this.#db.prepare('SELECT * FROM accounts WHERE owner=?').get(owner),
     );
-    if (
-      !record ||
-      record.scope.generation !== scope.generation ||
-      record.scope.expectedPhone !== scope.expectedPhone
-    )
-      throw new StoreError('STALE_GENERATION');
+    if (record && record.scope.expectedPhone !== scope.expectedPhone)
+      throw new StoreError('NUMBER_SCOPE_CHANGED');
     return record;
   }
   byInstance(name) {
     if (typeof name !== 'string' || !/^monzo_[a-f0-9]{48}_[1-9][0-9]{0,9}$/.test(name)) return null;
-    return this.#account(this.#db.prepare('SELECT * FROM accounts WHERE instance=?').get(name));
+    return this.#account(this.#db.prepare('SELECT * FROM instances WHERE instance=?').get(name));
+  }
+  priorInstances(input) {
+    const { scope, owner } = scoped(input);
+    this.account(scope);
+    return this.#db
+      .prepare(
+        'SELECT * FROM instances WHERE owner=? AND generation<? ORDER BY generation LIMIT 1000',
+      )
+      .all(owner, scope.generation)
+      .map((row) => this.#account(row));
+  }
+  updateInstance(input, data) {
+    json(data);
+    const { scope, name, owner } = scoped(input);
+    return this.atomic(() => {
+      const previous = this.byInstance(name);
+      if (!previous || previous.scope.expectedPhone !== scope.expectedPhone)
+        throw new StoreError('STALE_GENERATION');
+      const record = { ...previous, data };
+      this.#db
+        .prepare('UPDATE instances SET payload=?,updated_at=? WHERE instance=?')
+        .run(this.#seal('account', owner, record), this.#clock(), name);
+      const current = this.#db.prepare('SELECT generation FROM accounts WHERE owner=?').get(owner);
+      if (current.generation === scope.generation)
+        this.#db
+          .prepare('UPDATE accounts SET payload=?,updated_at=? WHERE owner=?')
+          .run(this.#seal('account', owner, record), this.#clock(), owner);
+      return record;
+    });
   }
   accounts() {
     return this.#db
@@ -338,6 +390,9 @@ export class DurableStore {
       this.#db
         .prepare('UPDATE accounts SET payload=?,updated_at=? WHERE owner=? AND generation=?')
         .run(this.#seal('account', owner, record), this.#clock(), owner, scope.generation);
+      this.#db
+        .prepare('UPDATE instances SET payload=?,updated_at=? WHERE instance=?')
+        .run(this.#seal('account', owner, record), this.#clock(), record.name);
       return record;
     });
   }
@@ -371,7 +426,7 @@ export class DurableStore {
     };
   }
   enqueue(input, kind, key, payload) {
-    const { scope, owner } = scoped(input);
+    const { scope, owner, name } = scoped(input);
     const id = recordId(kind, owner, scope.generation, key);
     const digest = this.#digest(json(payload));
     return this.atomic(() => {
@@ -382,7 +437,8 @@ export class DurableStore {
         !account ||
         account.scope.generation < scope.generation ||
         (kind === 'command' && account.scope.generation !== scope.generation) ||
-        account.scope.expectedPhone !== scope.expectedPhone
+        account.scope.expectedPhone !== scope.expectedPhone ||
+        !this.byInstance(name)
       )
         throw new StoreError('STALE_GENERATION');
       const previous = this.#db.prepare('SELECT * FROM journal WHERE id=?').get(id);
@@ -419,6 +475,28 @@ export class DurableStore {
         .prepare('SELECT * FROM journal WHERE id=?')
         .get(recordId(kind, owner, scope.generation, key)),
     );
+  }
+  prepareEvent(id, leaseToken, payload) {
+    json(payload, 60000);
+    return this.atomic(() => {
+      const row = this.#db
+        .prepare(
+          "SELECT * FROM journal WHERE id=? AND kind='event' AND state='PROCESSING' AND lease_token=?",
+        )
+        .get(id, leaseToken);
+      if (!row) throw new StoreError('STORAGE_LEASE_LOST');
+      const envelope = this.#open('journal', id, row.payload);
+      // Once a signed delivery may have left, its body is immutable on retries.
+      // The original candidate digest still protects the webhook's idempotency.
+      if (!envelope.prepared) {
+        envelope.payload = payload;
+        envelope.prepared = true;
+        this.#db
+          .prepare('UPDATE journal SET payload=?,updated_at=? WHERE id=?')
+          .run(this.#seal('journal', id, envelope), this.#clock(), id);
+      }
+      return this.#journal(this.#db.prepare('SELECT * FROM journal WHERE id=?').get(id));
+    });
   }
   claim(kind, { limit = 10, leaseMs = 30000 } = {}) {
     if (
@@ -460,7 +538,9 @@ export class DurableStore {
               .all(now, now, limit)
           : this.#db
               .prepare(
-                "SELECT * FROM journal WHERE kind='command' AND state='PENDING' AND available_at<=? ORDER BY seq LIMIT ?",
+                `SELECT j.* FROM journal j WHERE j.kind='command' AND j.state='PENDING' AND j.available_at<=?
+                  AND NOT EXISTS(SELECT 1 FROM journal older WHERE older.kind='command' AND older.owner=j.owner
+                    AND older.seq<j.seq AND older.state IN ('PENDING','PROCESSING')) ORDER BY j.seq LIMIT ?`,
               )
               .all(now, limit);
       return rows.map((row) => {

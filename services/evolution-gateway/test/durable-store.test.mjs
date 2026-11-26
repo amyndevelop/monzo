@@ -313,3 +313,102 @@ test('spool durable: rechaza permisos amplios, enlaces, versiones ajenas y paylo
   assert.throws(() => new DurableStore({ directory: r.directory, key: r.key }), /STORAGE_FILE/);
   assert.equal(readFileSync(external, 'utf8'), 'preserve');
 });
+
+test('spool durable: conserva instancias retiradas sin permitir que cambien la generación actual', (t) => {
+  const r = fixture(t);
+  const original = r.store.register(scope, {
+    state: 'CONNECTED',
+    verifiedPhone: scope.expectedPhone,
+  });
+  const next = { ...scope, generation: 2 };
+  r.store.register(next, { state: 'DISCONNECTED' });
+  assert.equal(r.store.byInstance(original.name).scope.generation, 1);
+  assert.equal(r.store.byInstance(original.name).data.verifiedPhone, scope.expectedPhone);
+  assert.equal(r.store.priorInstances(next).length, 1);
+  r.store.updateInstance(scope, { state: 'DISCONNECTED', closed: true });
+  assert.equal(r.store.byInstance(original.name).data.closed, true);
+  assert.deepEqual(r.store.account(next).data, { state: 'DISCONNECTED' });
+  assert.throws(() => r.store.updateAccount(scope, {}), /STALE_GENERATION/);
+  assert.throws(
+    () => r.store.updateInstance({ ...scope, expectedPhone: '15559999999' }, {}),
+    /STALE_GENERATION/,
+  );
+  r.store.enqueue(scope, 'event', 'delayed-receipt', {});
+  assert.throws(
+    () => r.store.enqueue({ ...scope, generation: 3 }, 'event', 'future', {}),
+    /STALE_GENERATION/,
+  );
+});
+
+test('spool durable: migra formato 1 sin alterar cuentas, journal ni credenciales cifradas', (t) => {
+  const r = fixture(t);
+  r.store.register(scope, { state: 'CONNECTED', verifiedPhone: scope.expectedPhone });
+  r.store.enqueue(scope, 'event', 'old-format', { text: 'preserve-encrypted-payload' });
+  r.store.close();
+  const db = new DatabaseSync(join(r.directory, 'gateway.sqlite'));
+  const before = db.prepare('SELECT hex(payload) AS bytes FROM journal').get().bytes;
+  const account = db.prepare('SELECT hex(payload) AS bytes FROM accounts').get().bytes;
+  db.exec('DROP TABLE instances; PRAGMA user_version=1;');
+  db.close();
+  r.reopen();
+  assert.equal(r.store.account(scope).data.state, 'CONNECTED');
+  assert.equal(r.store.priorInstances(scope).length, 0);
+  const name = r.store.account(scope).name;
+  assert.equal(r.store.byInstance(name).data.verifiedPhone, scope.expectedPhone);
+  assert.equal(
+    r.store.record(scope, 'event', 'old-format').payload.text,
+    'preserve-encrypted-payload',
+  );
+  r.store.close();
+  const after = new DatabaseSync(join(r.directory, 'gateway.sqlite'));
+  assert.equal(after.prepare('PRAGMA user_version').get().user_version, 2);
+  assert.equal(after.prepare('SELECT hex(payload) AS bytes FROM journal').get().bytes, before);
+  assert.equal(after.prepare('SELECT hex(payload) AS bytes FROM instances').get().bytes, account);
+  after.close();
+});
+
+test('spool durable: prepara el cuerpo una vez antes de enviarlo y lo conserva tras reiniciar', (t) => {
+  const r = fixture(t);
+  r.store.register(scope);
+  const candidate = { candidate: { text: 'message-one' } };
+  const event = r.store.enqueue(scope, 'event', 'prepare', candidate);
+  const [claimed] = r.store.claim('event');
+  assert.throws(() => r.store.prepareEvent(event.id, 'not-the-lease', {}), /STORAGE_LEASE_LOST/);
+  const prepared = r.store.prepareEvent(event.id, claimed.leaseToken, {
+    type: 'message',
+    verifiedAt: 1,
+    text: 'message-one',
+  });
+  assert.equal(prepared.prepared, true);
+  assert.deepEqual(
+    r.store.prepareEvent(event.id, claimed.leaseToken, { changed: true }).payload,
+    prepared.payload,
+  );
+  r.reopen();
+  const [retry] = r.store.claim('event');
+  assert.equal(retry.prepared, true);
+  assert.deepEqual(retry.payload, prepared.payload);
+  assert.deepEqual(r.store.enqueue(scope, 'event', 'prepare', candidate).payload, prepared.payload);
+  assert.throws(
+    () => r.store.enqueue(scope, 'event', 'prepare', { candidate: { text: 'different' } }),
+    /IDEMPOTENCY_CONFLICT/,
+  );
+});
+
+test('spool durable: ejecuta como máximo un comando por cuenta y permite avanzar a otra', (t) => {
+  const r = fixture(t),
+    other = { ...scope, accountId: 'other-account' };
+  r.store.register(scope);
+  r.store.register(other);
+  const first = r.store.enqueue(scope, 'command', 'first', {});
+  const second = r.store.enqueue(scope, 'command', 'second', {});
+  const independent = r.store.enqueue(other, 'command', 'other', {});
+  const claims = r.store.claim('command');
+  assert.deepEqual(
+    claims.map((c) => c.id),
+    [first.id, independent.id],
+  );
+  assert.deepEqual(r.store.claim('command'), []);
+  r.store.finish(first.id, claims[0].leaseToken, { state: 'DONE' });
+  assert.equal(r.store.claim('command')[0].id, second.id);
+});

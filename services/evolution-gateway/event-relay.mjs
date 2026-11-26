@@ -105,7 +105,17 @@ export async function relayEvents(store, config, options = {}) {
   const records = store.claim('event', { limit: 4, leaseMs: 30000 });
   return Promise.all(
     records.map(async (record) => {
-      const result = await deliverEvent(config, record, options);
+      let prepared = record;
+      if (options.prepare && !record.prepared) {
+        try {
+          prepared = await options.prepare(record);
+        } catch {
+          if (!store.retryEvent(record.id, record.leaseToken, 5000))
+            return { id: record.id, acknowledged: false, code: 'LEASE_LOST' };
+          return { id: record.id, acknowledged: false, code: 'EVENT_PREPARATION' };
+        }
+      }
+      const result = await deliverEvent(config, prepared, options);
       if (result.acknowledged) {
         if (!store.finish(record.id, record.leaseToken, { code: 'ACKNOWLEDGED' }))
           return { id: record.id, acknowledged: false, code: 'LEASE_LOST' };

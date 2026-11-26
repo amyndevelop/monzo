@@ -130,7 +130,24 @@ El worker existente ahora omite explícitamente proveedores distintos de META/BA
 
 ## Integración pendiente
 
-1. Integrar el journal durable con comandos, eventos y generaciones del gateway; completar firma/confirmación del retorno, despacho y límites. Definir almacenamiento de adjuntos privado y acotado antes de habilitarlos.
+El gateway 0.2.0 incorpora ahora el coordinador de instancias y normalizador de eventos. Los comandos connect/refresh/disconnect se guardan antes de contactar al proveedor y se ejecutan de a uno por cuenta; otra cuenta puede avanzar. El reemplazo de generación confirma primero el cierre de instancias anteriores. Una desconexión pedida durante una conexión en vuelo mantiene la intención de cerrar y no vuelve a exponer el QR. Tras un reinicio, un comando incierto no se repite; se consulta el estado del proveedor. La caducidad del mismo QR conserva su primer instante, también después de vencer o solicitar refresh.
+
+El spool pasa al formato 2 para conservar instancias retiradas y su última identidad comprobada; migra el formato 1 sin alterar ciphertext de cuentas/journal. El cuerpo que se firma se prepara una sola vez bajo concesión y queda inmutable en reintentos. Así, agregar una comprobación de identidad no cambia el digest de una entrega cuyo ACK pudo haberse perdido. Los candidatos sin identidad comprobada quedan pendientes; una vinculación con el teléfono equivocado se cierra y no se entrega su contenido privado. Los mensajes/recibos normalizados omiten API keys, URLs del proveedor, mediaKey, miniaturas y base64. Los LID necesitan un alternativo PN explícito. Se omiten grupos, estados, canales, mensajes de control y contenido de visualización única.
+
+Las rutas nuevas son POST `/v1/channels/command` y `/v1/channels/state`, con la credencial del gateway, scope exacto y comparación con el callback fijo; y POST `/internal/events`, con una credencial HMAC distinta por instancia/generación. La ruta interna no se agrega a Nginx. Todas quedan deshabilitadas salvo EVOLUTION_CHANNELS_ENABLED=true. El servidor valida formato/límites/tasas y nunca expone la API genérica del proveedor. El coordinador tiene un límite inicial de ocho cuentas registradas por gateway; ampliar capacidad requiere validar recursos y carga.
+
+Main registra los loops de comandos, retorno, consulta de estado y limpieza solamente cuando el canal está habilitado y hay EVOLUTION_STORAGE_KEY independiente. El Dockerfile incluye los módulos y prepara `/state` 0700 para node; Compose agrega un volumen privado y conserva la bandera en **false por defecto**. **Nada de esto se reconstruyó ni habilitó en el VPS.** No se generó todavía su clave real de almacenamiento ni se cambió su retorno. El Nginx publicado continúa permitiendo solamente el diagnóstico de Etapa 2.
+
+Validación: 75 pruebas de probe/gateway/instancias/coordinador/normalizador/spool/setup aprobadas. Una prueba adicional recorre el coordinador, firma, receptor real y PostgreSQL local: QR, identidad, mensaje duplicado, intervención humana y recibo tardío de la generación anterior sin alterar la sesión actual. Usa proveedor controlado y no contacta WhatsApp. La imagen Node fijada se construyó y arrancó con canales habilitados, UID 1000, SQLite 0600, raíz readonly, sin red o puertos publicados, 128 MiB y cierre limpio. Solo se usaron claves y almacenamiento de fixture.
+
+```bash
+node --import tsx --test --test-isolation=none scripts/test-evolution-probe.mjs services/evolution-gateway/test/*.test.mjs
+node --import tsx scripts/test-evolution-channel-contract.mjs
+```
+
+Este incremento no completa la vinculación desde Canales: faltan las rutas autorizadas de propietario y la interfaz, el envío específico de Evolution, los adjuntos privados y la recuperación de historial. El normalizador prepara metadatos de adjuntos, pero no anuncia una descarga hasta que existan bytes verificados en su almacenamiento. **No habilitar todavía la bandera ni pedir al usuario escanear un código.**
+
+1. Completar el envío de mensajes con comandos idempotentes y resultado durable. Definir almacenamiento de adjuntos privado y acotado antes de habilitarlos.
 2. Completar rutas y despachador de Evolution con selección explícita del proveedor, sin reutilizar credenciales de Meta ni la sesión del worker Baileys existente. La migración de Neon ya fue confirmada y el modelo está incorporado.
 3. Canales: preparación del teléfono por propietario, escaneo/renovación/caducidad, identidad comprobada, conexión/desconexión y recuperación. QR oculto a miembros sin permiso; abortar solicitudes al cambiar de empresa; confirmación real antes de anunciar Conectado.
 4. Conversaciones: recepción/envío, recibos fuera de orden, duplicados, mensajes desde el teléfono, pausa del bot ante intervención humana y recuperación de resultado incierto. Integrar adjuntos e historial acotado con límites explícitos y conservación del compositor/borradores.
