@@ -1,9 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
+import { spawn } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { readConfig, checkEvolution } from '../core.mjs';
 import { createGateway } from '../server.mjs';
+import { inspectCallback } from '../inspect-callback.mjs';
 import { PROTOCOL, PROBE_PATH, probeSignature, verifyProbe, responseProof } from '../protocol.mjs';
 
 const key = () => randomBytes(32).toString('hex');
@@ -392,4 +395,95 @@ test('comprobación del operador: credencial solo al gateway, redirecciones rech
     }),
     /UNREACHABLE/,
   );
+});
+
+test('inspección del retorno: distingue secreto ausente, autorización, redirección y respuesta incorrecta', async (t) => {
+  const r = await rig(t, { vercelProtection: true, vercelKey: 'correct' });
+  const success = await inspectCallback(r.config);
+  assert.equal(success.code, 'OK');
+  assert.equal(success.httpStatus, 200);
+  for (const [status, payload, expected] of [
+    [503, { error: 'NOT_CONFIGURED' }, 'NOT_CONFIGURED'],
+    [503, { error: 'private-error-not-exported' }, 'HTTP_ERROR'],
+    [401, { error: 'UNAUTHORIZED' }, 'AUTH'],
+    [200, { challenge: key(), proof: key() }, 'INVALID_RESPONSE'],
+  ]) {
+    const result = await inspectCallback(r.config, async () => Response.json(payload, { status }));
+    assert.equal(result.code, expected);
+    assert.equal(result.httpStatus, status);
+    assert.equal(JSON.stringify(result).includes('private-error'), false);
+  }
+  let calls = 0;
+  const redirect = await inspectCallback(r.config, async (url, init) => {
+    calls++;
+    assert.equal(url, r.config.callbackUrl);
+    assert.equal(init.redirect, 'manual');
+    assert.equal('authorization' in init.headers, false);
+    return new Response(null, {
+      status: 302,
+      headers: { location: 'https://private.example.test/?secret=private' },
+    });
+  });
+  assert.equal(redirect.code, 'REDIRECT');
+  assert.equal(calls, 1);
+  assert.equal(JSON.stringify(redirect).includes('private'), false);
+});
+
+test('inspección del retorno: errores de red limitados sin filtrar mensajes privados', async (t) => {
+  const r = await rig(t);
+  for (const [error, expected] of [
+    [new Error('private network details', { cause: { code: 'ENOTFOUND' } }), 'ENOTFOUND'],
+    [new Error('private network details', { cause: { code: 'private-secret' } }), 'NETWORK_OR_TLS'],
+    [new DOMException('private timeout details', 'TimeoutError'), 'TIMEOUT'],
+  ]) {
+    const result = await inspectCallback(r.config, async () => {
+      throw error;
+    });
+    assert.equal(result.code, expected);
+    assert.equal(result.httpStatus, null);
+    assert.equal(JSON.stringify(result).includes('private'), false);
+  }
+});
+
+test('inspección desde stdin: usa la configuración real del proceso y muestra solo destino y estados', async (t) => {
+  const r = await rig(t, { vercelProtection: true, vercelKey: 'correct' });
+  const child = spawn(process.execPath, ['--input-type=module'], {
+    cwd: new URL('../', import.meta.url),
+    env: {
+      ...process.env,
+      NODE_USE_ENV_PROXY: '0',
+      NODE_ENV: 'test',
+      EVOLUTION_ORIGIN: r.config.evolutionOrigin,
+      MONZO_CALLBACK_URL: r.config.callbackUrl,
+      EVOLUTION_API_KEY: r.config.apiKey,
+      EVOLUTION_GATEWAY_KEY: r.config.gatewayKey,
+      EVOLUTION_WEBHOOK_SECRET: r.config.webhookSecret,
+      VERCEL_AUTOMATION_BYPASS_SECRET: r.config.vercelBypassSecret,
+    },
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
+  t.after(() => child.kill());
+  let output = '';
+  child.stdout.on('data', (part) => {
+    output += part;
+  });
+  child.stderr.on('data', (part) => {
+    output += part;
+  });
+  const completed = new Promise((resolve, reject) => {
+    child.once('error', reject);
+    child.once('close', resolve);
+  });
+  child.stdin.end(readFileSync(new URL('../inspect-callback.mjs', import.meta.url)));
+  assert.equal(await completed, 0);
+  assert.ok(output.includes('Destino del gateway: ' + new URL(r.config.callbackUrl).origin));
+  assert.ok(output.includes('HTTP del Preview: 200'));
+  assert.ok(output.includes('Resultado: OK'));
+  for (const secret of [
+    r.config.apiKey,
+    r.config.gatewayKey,
+    r.config.webhookSecret,
+    r.config.vercelBypassSecret,
+  ])
+    assert.equal(output.includes(secret), false);
 });

@@ -248,3 +248,19 @@ Actualizar el checkout del VPS con `git pull --ff-only`. Desde `~/monzo-evolutio
 El usuario 0 del contenedor rootless corresponde al usuario adminuh del host y puede leer el archivo 0600. El comando envía únicamente la credencial del gateway a su dirección HTTPS, sin seguir redirecciones. El gateway consulta Evolution y realiza el desafío HMAC al destino fijo de MONZO, con la cabecera privada de automatizaciones de Vercel cuando corresponde. El script valida el protocolo, desafío, fecha, versión y códigos de respuesta; solo imprime estados permitidos. Una respuesta de éxito exige `Evolution y credencial interna: OK` y `Retorno HMAC a MONZO: OK`. No imprime claves ni cuerpos del proveedor, no crea instancias, no envía mensajes y no modifica la base de MONZO.
 
 Las 21 pruebas locales de gateway/setup incluyen el diagnóstico con ida y vuelta HTTP controlada, prueba HMAC incorrecta, credencial limitada al gateway, redirecciones bloqueadas y desafío incorrecto. No equivalen a la comprobación pendiente desde el VPS contra el Preview real ni a una vinculación de teléfono.
+
+### Identificar un fallo del Preview desde el gateway en ejecución
+
+El primer diagnóstico real confirmó Evolution y su credencial interna, pero devolvió `CALLBACK_UNREACHABLE`. Una comprobación firmada dentro del gateway recibió HTTP 503 y el marcador `NOT_CONFIGURED`: en ese despliegue `EVOLUTION_WEBHOOK_SECRET` estaba ausente o no cumplía el formato de 64 caracteres hexadecimales minúsculos. El usuario corrigió los valores sin comillas y redesplegó, pero el diagnóstico resumido continuó fallando. Todavía no está comprobado si el último fallo tiene la misma causa; no rotar claves ni cambiar producción por esa suposición.
+
+Después de actualizar el checkout con `git pull --ff-only`, ejecutar desde su raíz:
+
+```bash
+./scripts/evolution-compose.sh exec -T evolution-gateway node --input-type=module < services/evolution-gateway/inspect-callback.mjs
+```
+
+Este script se envía por stdin al contenedor existente y usa sus módulos y variables ya cargadas. No se necesita reconstruir, reiniciar ni copiar archivos a la imagen. Muestra el origen público exacto del retorno, estado HTTP, código acotado y duración. Envía un desafío firmado al destino fijo, verifica la prueba de respuesta y no sigue redirecciones. No imprime claves, firmas, cuerpos, parámetros SSO ni mensajes arbitrarios de excepciones. No escribe datos ni envía mensajes WhatsApp. El plazo de 20 segundos permite distinguir un retorno lento de los 7 segundos de la comprobación normal, sin cambiar ese límite del servicio.
+
+`NOT_CONFIGURED` con HTTP 503 exige revisar el valor y el alcance Preview/rama de `EVOLUTION_WEBHOOK_SECRET` en el despliegue del destino mostrado. HTTP 401/403 produce `AUTH`, una redirección produce `REDIRECT` y una respuesta correcta exige `OK` con prueba HMAC válida. Los errores de red solo muestran códigos permitidos. Un `OK` aquí debe corroborarse después repitiendo el diagnóstico completo del gateway.
+
+Las 24 pruebas locales de gateway/setup pasaron, incluyendo la invocación exacta por stdin con la configuración del proceso y una respuesta HMAC real en servidores HTTP controlados. Las comprobaciones del Preview real continúan dependiendo de la salida del VPS del usuario.
