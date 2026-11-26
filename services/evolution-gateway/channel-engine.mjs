@@ -20,6 +20,7 @@ const codes = new Set([
   'INSTANCE_REJECTED',
   'EVOLUTION_AUTH',
   'PROCESS_INTERRUPTED',
+  'QR_EXPIRED',
 ]);
 export class ChannelError extends StoreError {
   constructor(code, status = 409) {
@@ -234,6 +235,14 @@ export class ChannelEngine {
       data.state = 'QR';
       data.qr = previous.qr;
       data.qrExpiresAt = previous.qrExpiresAt;
+    } else if (
+      ['CONNECTING', 'DISCONNECTED'].includes(state) &&
+      data.desiredState === 'CONNECTED' &&
+      previous.qrCodeHash &&
+      previous.qrIssuedAt + 45000 <= now
+    ) {
+      data.state = 'CONNECTING';
+      data.lastErrorCode = 'QR_EXPIRED';
     }
     if (data.desiredState === 'DISCONNECTED') {
       if (!['DISCONNECTED', 'ERROR'].includes(data.state)) data.state = 'DISCONNECTING';

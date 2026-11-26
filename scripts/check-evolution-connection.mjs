@@ -1,10 +1,10 @@
 import { randomBytes } from 'node:crypto';
-import { readFileSync } from 'node:fs';
-import { parseEnv } from 'node:util';
+import { parseArgs, parseEnv } from 'node:util';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readConfig, readJson } from '../services/evolution-gateway/core.mjs';
 import { PROTOCOL, PROBE_PATH } from '../services/evolution-gateway/protocol.mjs';
+import { privateFile } from './prepare-evolution-preview.mjs';
 
 const evolutionCodes = new Set([
   'OK',
@@ -80,8 +80,14 @@ export async function checkGatewayConnection(config, origin, transport = fetch) 
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
-    if (process.argv.length !== 2) throw new ConnectionCheckError('ARGUMENTS');
-    const env = parseEnv(readFileSync('.env.evolution', 'utf8'));
+    const { values } = parseArgs({
+      options: { channels: { type: 'boolean' } },
+      strict: true,
+      allowPositionals: false,
+    });
+    const env = parseEnv(
+      privateFile(values.channels ? '.evolution/channels.env' : '.env.evolution'),
+    );
     const config = readConfig({ ...env, MONZO_CALLBACK_URL: env.MONZO_ORIGIN + PROBE_PATH });
     const result = await checkGatewayConnection(config, gatewayOrigin(env.EVOLUTION_PUBLIC_HOST));
     console.log('Evolution y credencial interna: ' + result.evolutionCode);

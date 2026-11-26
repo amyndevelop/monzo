@@ -27,7 +27,7 @@ export async function attachmentContext(
   });
   if (!member || !conversation)
     throw new AttachmentError(403, 'ACCESS', 'No tenés acceso a esta conversación.');
-  if (conversation.account.provider === 'BAILEYS')
+  if (conversation.account.provider !== 'META')
     throw new AttachmentError(
       409,
       'UNSUPPORTED_PROVIDER',
@@ -36,7 +36,7 @@ export async function attachmentContext(
   return conversation;
 }
 function assertSendable(conversation: Awaited<ReturnType<typeof attachmentContext>>) {
-  if (conversation.account.provider === 'BAILEYS')
+  if (conversation.account.provider !== 'META')
     throw new AttachmentError(
       409,
       'UNSUPPORTED_PROVIDER',

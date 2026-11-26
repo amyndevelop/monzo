@@ -59,6 +59,7 @@ export const evolutionPayloadSchema = z.discriminatedUnion('type', [
           'INSTANCE_REJECTED',
           'EVOLUTION_AUTH',
           'PROCESS_INTERRUPTED',
+          'QR_EXPIRED',
         ])
         .optional(),
     })

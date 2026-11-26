@@ -18,6 +18,7 @@ import urllib.request
 
 ROOT = Path(__file__).resolve().parent.parent
 PROPOSAL = ROOT / "deploy/evolution/nginx-onlineboosty.conf"
+CHANNELS_PROPOSAL = ROOT / "deploy/evolution/nginx-onlineboosty-channels.conf"
 TARGET = Path("/etc/nginx/sites-available/renovar-onlineboosty")
 ENABLED = Path("/etc/nginx/sites-enabled/renovar-onlineboosty")
 BACKUPS = Path("/var/backups/monzo-evolution-nginx")
@@ -136,9 +137,9 @@ def private_nginx_check(candidate, target=TARGET):
     subprocess.run(["unshare", "--mount", "--propagation", "private", "--", "sh", "-eu", "-c", 'mount --bind "$1" "$2"\nnginx -t', "monzo-nginx-check", str(candidate), str(target)], check=True)
 
 
-def preflight():
+def preflight(proposal=PROPOSAL):
     regular(TARGET)
-    regular(PROPOSAL)
+    regular(proposal)
     if ENABLED.resolve(strict=True) != TARGET:
         raise PublishError("El enlace del sitio cambió; revisalo antes de continuar.")
     cert = "/etc/letsencrypt/live/onlineboosty.com.ar/fullchain.pem"
@@ -157,7 +158,7 @@ def reload_nginx():
     subprocess.run(["systemctl", "reload", "nginx"], check=True)
 
 
-def probe_local_https(timeout, *, address=("127.0.0.1", 443), context=None):
+def probe_local_https(timeout, *, address=("127.0.0.1", 443), context=None, path="/v1/diagnostics"):
     # Connect locally but validate the certificate and SNI for the real domain.
     # No DNS/proxy redirect, authentication header, or customer data is involved.
     context = context or ssl.create_default_context()
@@ -169,7 +170,7 @@ def probe_local_https(timeout, *, address=("127.0.0.1", 443), context=None):
         except BaseException:
             raw.close()
             raise
-        connection.request("POST", "/v1/diagnostics", body=b"{}", headers={"Content-Type": "application/json", "Connection": "close"})
+        connection.request("POST", path, body=b"{}", headers={"Content-Type": "application/json", "Connection": "close"})
         response = connection.getresponse()
         body = response.read(4097)
         matched = False
@@ -219,6 +220,7 @@ def main():
     modes.add_argument("--check", action="store_true", help="Validar sin reemplazar el sitio activo (opción predeterminada).")
     modes.add_argument("--apply", action="store_true", help="Respaldar y reemplazar solo el sitio identificado, tras aprobación.")
     modes.add_argument("--rollback", metavar="DIRECTORIO", help="Restaurar un respaldo anterior creado por esta herramienta.")
+    parser.add_argument("--channels", action="store_true", help="Usar la propuesta acotada de QR y mensajes de la Etapa 3.")
     args = parser.parse_args()
     try:
         if os.geteuid() != 0:
@@ -233,16 +235,23 @@ def main():
             print("Configuración del sitio restaurada desde el respaldo indicado.")
             print("Respaldo de la configuración reemplazada: " + str(previous))
         else:
-            preflight()
+            proposal = CHANNELS_PROPOSAL if args.channels else PROPOSAL
+            preflight(proposal)
             if not args.apply:
-                private_nginx_check(PROPOSAL)
+                private_nginx_check(proposal)
                 print("Comprobación HTTPS correcta. El sitio activo no se reemplazó ni se recargó.")
                 return 0
             def interrupted(_signum, _frame):
                 raise KeyboardInterrupt
             for item in (signal.SIGTERM, signal.SIGHUP):
                 signal.signal(item, interrupted)
-            directory = apply_site(PROPOSAL, TARGET, BACKUPS, private_nginx_check, reload_nginx, https_check)
+            def verify_routes():
+                paths = ["/v1/diagnostics"]
+                if args.channels:
+                    paths += ["/v1/channels/command", "/v1/channels/state"]
+                for path in paths:
+                    https_check(probe=lambda timeout: probe_local_https(timeout, path=path))
+            directory = apply_site(proposal, TARGET, BACKUPS, private_nginx_check, reload_nginx, verify_routes)
             print("HTTPS del gateway aplicado. Se comprobó el rechazo sin credencial (HTTP 401).")
             print("Respaldo privado: " + str(directory))
     except KeyboardInterrupt:

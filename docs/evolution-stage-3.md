@@ -1,6 +1,18 @@
 # Evolution · Etapa 3: QR y conversaciones
 
-Estado al 26/11/2026: desarrollo en **feat/evolution-conversations**, desde `4f78ceb`. El usuario ya accede al Preview con sesión verificada y empresa de pruebas creada; confirmó la actualización de Neon a doce migraciones. Hay adaptador de instancias, journal cifrado, relay firmado y receptor transaccional de eventos. Todavía no ofrece vinculación Evolution desde Canales ni habilita números. El VPS conserva su stack y retorno de diagnóstico de Etapa 2; el receptor nuevo queda deshabilitado por defecto hasta completar la integración.
+Estado al 26/11/2026: desarrollo en **feat/evolution-conversations**, desde `4f78ceb`. El usuario ya accede al Preview y confirmó Neon con doce migraciones. Están implementados Canales con QR y acciones de propietario, receptor firmado y envío durable de texto desde Conversaciones. Pasaron los recorridos locales con proveedor controlado en escritorio y móvil. El VPS conserva todavía su stack y retorno de diagnóstico de Etapa 2; no se escaneó un teléfono ni se enviaron mensajes reales. **La fase 3 no está completa**: faltan la instalación/prueba física de esta entrega, adjuntos de Evolution e importación del historial anterior.
+
+## Entrega actual: QR y texto
+
+Canales permite preparar hasta tres números por empresa, generar/renovar el QR, comprobar el teléfono y solicitar su desconexión. El QR se cifra en base, caduca sin extenderse al repetir el mismo código y solo se devuelve al propietario. Carga, vacío, espera, vencimiento, teléfono equivocado, desconexión y error tienen estados y acciones explícitos. Se conservan los campos al fallar, el foco pasa a Generar QR tras preparar el número y las consultas anteriores se invalidan al cambiar de empresa o ejecutar una acción. La conexión anterior queda en un panel plegable; Meta sigue disponible. Los miembros ven el estado, sin QR ni acciones de vinculación.
+
+El despachador selecciona explícitamente EVOLUTION, conserva el ID del proveedor antes del RPC y revalida identidad, sesión, rol y pausa del bot al reclamar. Mantiene orden por cuenta; un resultado incierto no vuelve a enviarse automáticamente. Los recibos pueden reconciliarlo. El envío desde el chat se agenda después de responder y los heartbeats vuelven a buscar pendientes, sin depender de una llamada QStash hacia un Preview protegido. Un SENDING abandonado pasa a UNKNOWN con su ID original. El chat mantiene pantalla completa y compositor; no ofrece plantillas de Meta ni el adjuntador todavía no implementado para este proveedor. La intervención humana desde el teléfono pausa la automatización existente.
+
+Los comandos de preparación y publicación están en [la guía de prueba del Preview](evolution-channels-rollout.md). Crean un archivo privado separado, conservan las claves y configuración de Etapa 2 y generan una clave independiente para el spool del VPS. El publicador puede seleccionar las rutas acotadas de canales y verificar sus tres rechazos sin credencial, con respaldo y rollback automático. **Estos pasos no se ejecutaron en el VPS desde esta conversación.** La bandera continúa deshabilitada por defecto y no hay otra migración además de la número doce ya aplicada.
+
+Verificación local: seis recorridos de navegador (tres en escritorio y móvil) hasta PostgreSQL real, firmas, spool y UI, con proveedor controlado; 25 pruebas de acciones/receptor/despacho; pruebas del gateway y del publicador HTTPS. Las capturas de fixture se revisaron visualmente, sin desbordamiento horizontal y con chat a pantalla completa. Esto no sustituye la prueba física ni demuestra disponibilidad de WhatsApp real.
+
+Las secciones siguientes conservan el registro de preparación y validaciones sucesivas; las limitaciones de cada incremento describen su estado en ese momento.
 
 ## Entorno de pruebas
 
@@ -128,7 +140,7 @@ La transacción bloquea la empresa, valida proveedor/cuenta/teléfono/generació
 
 El worker existente ahora omite explícitamente proveedores distintos de META/BAILEYS para evitar que Evolution intente salir por Meta. Los trabajos automáticos de Evolution quedan pendientes de su despachador específico; esta ruta no constituye todavía un canal utilizable. Las nueve pruebas del receptor pasaron con PostgreSQL real exclusivamente en monzo_test local: duplicados concurrentes, aislamiento, rollback de QR, recibos fuera de orden, intervención humana y rechazo de bytes/esquema/firma antes de escribir. También pasaron tipos, lint, build Webpack y las 28 pruebas existentes de Evolution/WhatsApp en escritorio y móvil. El build necesitó ejecutar sus procesos hijos fuera del sandbox; no se cambió configuración de Next o TypeScript para omitir comprobaciones.
 
-## Integración pendiente
+## Registro de integración del gateway
 
 El gateway 0.2.0 incorpora ahora el coordinador de instancias y normalizador de eventos. Los comandos connect/refresh/disconnect se guardan antes de contactar al proveedor y se ejecutan de a uno por cuenta; otra cuenta puede avanzar. El reemplazo de generación confirma primero el cierre de instancias anteriores. Una desconexión pedida durante una conexión en vuelo mantiene la intención de cerrar y no vuelve a exponer el QR. Tras un reinicio, un comando incierto no se repite; se consulta el estado del proveedor. La caducidad del mismo QR conserva su primer instante, también después de vencer o solicitar refresh.
 
@@ -158,11 +170,12 @@ El contrato hasta PostgreSQL ahora incluye el caso en que el proveedor emite el 
 node scripts/test-evolution-send-id-patch.mjs /tmp/monzo-evolution-main-unpatched.js
 ```
 
-1. Conectar el envío durable del gateway a las acciones de MONZO. Definir almacenamiento de adjuntos privado y acotado antes de habilitarlos.
-2. Completar rutas y despachador de Evolution con selección explícita del proveedor, sin reutilizar credenciales de Meta ni la sesión del worker Baileys existente. La migración de Neon ya fue confirmada y el modelo está incorporado.
-3. Canales: preparación del teléfono por propietario, escaneo/renovación/caducidad, identidad comprobada, conexión/desconexión y recuperación. QR oculto a miembros sin permiso; abortar solicitudes al cambiar de empresa; confirmación real antes de anunciar Conectado.
-4. Conversaciones: recepción/envío, recibos fuera de orden, duplicados, mensajes desde el teléfono, pausa del bot ante intervención humana y recuperación de resultado incierto. Integrar adjuntos e historial acotado con límites explícitos y conservación del compositor/borradores.
-5. Persistencia/recuperación real de sesión, backups cifrados y restauración en aislamiento, dos empresas y permisos cruzados, móvil/escritorio/teclado. El número secundario solo se conecta cuando la integración durable esté completa.
+## Pendientes actuales
+
+1. Ejecutar la guía de instalación exclusivamente en el Preview y motor rootless propios; verificar el retorno firmado del nuevo destino y las rutas HTTPS antes de generar un QR.
+2. Comprobar con un número secundario el escaneo físico, recepción/respuesta de texto, recibos, reconexión/persistencia tras reiniciar y pausa humana del bot. La entrega local de texto está comprobada; el comportamiento real de WhatsApp sigue pendiente.
+3. Incorporar adjuntos privados y acotados e historial anterior, con mensajes claros de disponibilidad y sin anunciar descargas hasta tener los bytes verificados. Hoy solo funciona el texto del nuevo proveedor; las funciones de Meta conservan su alcance.
+4. Completar pruebas de recuperación y carga, backups cifrados y restauración en aislamiento antes del piloto principal de BOOSTIFY. Las pruebas de permisos cruzados, móvil/escritorio y teclado de la entrega actual ya pasaron localmente.
 
 UX/UI: mantener la identidad de MONZO, el chat a pantalla completa y el menú plegable. Distinguir preparación, solicitud pendiente, espera de QR, QR vencido, comprobación del teléfono, conectado y desconectado. Los errores deben conservar los datos ingresados y ofrecer una acción concreta; no mostrar credenciales o detalles de infraestructura como decisiones del usuario comercial. La recepción efectiva se confirma por el primer mensaje real y no por el estado técnico del servidor.
 

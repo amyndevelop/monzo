@@ -11,6 +11,13 @@ import {
 } from './meta';
 import { withinWindow } from './payload';
 import { checkQueuedTemplate, templateComponents } from './templates';
+import { outboundMessageId } from '../../../../services/evolution-gateway/protocol.mjs';
+import { ChannelRpcError, type EvolutionCommand } from '../../evolution/channel-api';
+import { evolutionSessionReady } from '../../evolution/session-ready';
+export type EvolutionOutbox = {
+  key: string;
+  submit: (command: Extract<EvolutionCommand, { operation: 'send' }>) => Promise<unknown>;
+};
 export type WebTransport = {
   owner: string;
   send: (
@@ -26,6 +33,7 @@ export async function processOutbound(
   messageId: string,
   transport?: MetaFetch,
   web?: WebTransport,
+  evolution?: EvolutionOutbox,
 ) {
   const candidate = await db.message.findUnique({
     where: { id: messageId },
@@ -33,11 +41,12 @@ export async function processOutbound(
   });
   if (
     !candidate ||
-    !['META', 'BAILEYS'].includes(candidate.account.provider) ||
-    (candidate.account.provider === 'BAILEYS') !== Boolean(web)
+    (web && evolution) ||
+    candidate.account.provider !== (web ? 'BAILEYS' : evolution ? 'EVOLUTION' : 'META')
   )
     return;
-  if (web && !['text', 'interactive'].includes(candidate.type)) {
+  const qr = Boolean(web || evolution);
+  if (qr && !['text', 'interactive'].includes(candidate.type)) {
     await db.message.updateMany({
       where: { id: messageId, status: 'QUEUED' },
       data: { status: 'FAILED', errorCode: 'QR_UNSUPPORTED_TYPE' },
@@ -52,12 +61,29 @@ export async function processOutbound(
     const message = await tx.message.findUnique({
       where: { id: messageId },
       include: {
-        account: { include: { webSession: true } },
+        account: { include: { webSession: true, evolutionSession: true } },
         template: true,
         conversation: { include: { contact: true } },
       },
     });
     if (!message || message.direction !== 'OUTBOUND' || message.status !== 'QUEUED') return null;
+    if (
+      evolution &&
+      (await tx.message.findFirst({
+        where: {
+          tenantId: message.tenantId,
+          accountId: message.accountId,
+          direction: 'OUTBOUND',
+          status: { in: ['QUEUED', 'SENDING'] },
+          OR: [
+            { createdAt: { lt: message.createdAt } },
+            { createdAt: message.createdAt, id: { lt: message.id } },
+          ],
+        },
+        select: { id: true },
+      }))
+    )
+      return null;
     if (
       web &&
       (!message.account.webSession ||
@@ -68,6 +94,7 @@ export async function processOutbound(
         message.account.webSession.leaseUntil.getTime() <= Date.now())
     )
       return null;
+    if (evolution && !evolutionSessionReady(message.account.evolutionSession)) return null;
     const membership = message.createdByUserId
       ? await tx.membership.findUnique({
           where: {
@@ -102,11 +129,11 @@ export async function processOutbound(
         : null;
     const problem = !membership
       ? 'MEMBERSHIP_REVOKED'
-      : !message.account.enabled || (!web && !message.account.tokenEncrypted)
+      : !message.account.enabled || (!qr && !message.account.tokenEncrypted)
         ? 'ACCOUNT_DISABLED'
-        : !web && message.type !== 'template' && !withinWindow(message.conversation.lastInboundAt)
+        : !qr && message.type !== 'template' && !withinWindow(message.conversation.lastInboundAt)
           ? 'WINDOW_CLOSED'
-          : message.account.lastErrorCode === 'META_190'
+          : message.account.provider === 'META' && message.account.lastErrorCode === 'META_190'
             ? 'CREDENTIALS_UNAVAILABLE'
             : null;
     const templateProblem =
@@ -140,7 +167,7 @@ export async function processOutbound(
     }
     let token = '';
     try {
-      if (!web)
+      if (!qr)
         token = decryptToken(
           message.account.tokenEncrypted!,
           message.tenantId,
@@ -153,9 +180,25 @@ export async function processOutbound(
       });
       return null;
     }
+    const attemptedAt = new Date();
+    const providerId = evolution
+      ? outboundMessageId(evolution.key, message.tenantId, message.accountId, message.id)
+      : null;
+    const evolutionScope = evolution
+      ? {
+          tenantId: message.tenantId,
+          accountId: message.accountId,
+          generation: message.account.evolutionSession!.generation,
+          expectedPhone: message.account.evolutionSession!.expectedWaId,
+        }
+      : null;
     await tx.message.update({
       where: { id: message.id },
-      data: { status: 'SENDING', attemptedAt: new Date() },
+      data: {
+        status: 'SENDING',
+        attemptedAt,
+        ...(evolutionScope ? { providerId, channelGeneration: evolutionScope.generation } : {}),
+      },
     });
     return {
       id: message.id,
@@ -171,10 +214,28 @@ export async function processOutbound(
       credentialVersion: message.account.tokenEncrypted!,
       webGeneration: message.account.webSession?.generation ?? 0,
       automation: snapshot?.success ? snapshot.data : null,
+      providerId,
+      evolutionScope,
+      attemptedAt,
     };
   });
   if (!claimed) return;
   try {
+    if (evolution && claimed.evolutionScope && claimed.providerId) {
+      await evolution.submit({
+        scope: claimed.evolutionScope,
+        commandId: 'message:' + claimed.id,
+        operation: 'send',
+        deadline: claimed.attemptedAt.getTime() + 120000,
+        data: {
+          messageId: claimed.id,
+          providerId: claimed.providerId,
+          to: claimed.to,
+          text: claimed.text,
+        },
+      });
+      return;
+    }
     const providerId = web
       ? await web.send(
           claimed.accountId,
@@ -243,6 +304,15 @@ export async function processOutbound(
       });
     });
   } catch (error) {
+    if (evolution) {
+      const rpc =
+        error instanceof ChannelRpcError ? error : new ChannelRpcError('RESULT_UNKNOWN', true);
+      await db.message.updateMany({
+        where: { id: claimed.id, status: 'SENDING' },
+        data: { status: rpc.uncertain ? 'UNKNOWN' : 'FAILED', errorCode: 'EVOLUTION_' + rpc.code },
+      });
+      return;
+    }
     const meta = error instanceof MetaError ? error : new MetaError('RESULT_UNKNOWN', true);
     await db.message.updateMany({
       where: { id: claimed.id, status: 'SENDING' },

@@ -73,6 +73,71 @@ test('diagnóstico privado identifica variables faltantes sin devolver secretos 
   expect(member.canManage).toBe(false);
   await f.api.dispose();
 });
+test('recuperación de Meta no cuenta, publica ni cambia envíos de proveedores QR', async () => {
+  const f = await fixture(),
+    conversation = await received(f);
+  const old = new Date(Date.now() - 180000);
+  const meta = await db.message.create({
+    data: {
+      tenantId: f.tenant.id,
+      accountId: f.account.id,
+      conversationId: conversation.id,
+      direction: 'OUTBOUND',
+      type: 'text',
+      text: 'Meta sin resultado',
+      status: 'SENDING',
+      attemptedAt: old,
+      occurredAt: old,
+    },
+  });
+  const ids: string[] = [];
+  for (const [i, provider] of ['BAILEYS', 'EVOLUTION'].entries()) {
+    const account = await db.whatsappAccount.create({
+      data: {
+        tenantId: f.tenant.id,
+        provider,
+        phoneNumberId: f.account.phoneNumberId + i,
+        businessAccountId: 'fixture',
+        displayPhone: 'Fixture QR',
+        displayName: 'Fixture QR',
+      },
+    });
+    const contact = await db.contact.create({
+      data: { tenantId: f.tenant.id, accountId: account.id, waId: '15551234567' },
+    });
+    const chat = await db.conversation.create({
+      data: { tenantId: f.tenant.id, accountId: account.id, contactId: contact.id },
+    });
+    for (const status of ['QUEUED', 'SENDING'] as const) {
+      const message = await db.message.create({
+        data: {
+          tenantId: f.tenant.id,
+          accountId: account.id,
+          conversationId: chat.id,
+          direction: 'OUTBOUND',
+          type: 'text',
+          text: 'QR a cargo de su despachador',
+          status,
+          attemptedAt: status === 'SENDING' ? old : null,
+          occurredAt: old,
+        },
+      });
+      ids.push(message.id);
+    }
+  }
+  const base = `/api/workspaces/${f.tenant.id}/whatsapp`;
+  expect((await (await f.api.get(base + '/accounts')).json()).pendingJobs).toBe(1);
+  const result = await f.api.post(base + '/recover', { data: {} });
+  expect(result.ok()).toBe(true);
+  expect((await result.json()).queued).toBe(0);
+  expect((await db.message.findUniqueOrThrow({ where: { id: meta.id } })).status).toBe('UNKNOWN');
+  const untouched = await db.message.findMany({ where: { id: { in: ids } } });
+  expect(untouched.filter((m) => m.status === 'QUEUED')).toHaveLength(2);
+  expect(untouched.filter((m) => m.status === 'SENDING')).toHaveLength(2);
+  expect(untouched.every((m) => !m.errorCode && !m.jobPublishedAt)).toBe(true);
+  expect((await (await f.api.get(base + '/accounts')).json()).pendingJobs).toBe(0);
+  await f.api.dispose();
+});
 test('callback: firma, rotación, caducidad, destino y cuerpo original', async ({ request }) => {
   const raw = JSON.stringify({ kind: 'inbox', id: 'nonexistent-fixture-id' });
   expect(await verifyJob(raw, signature(raw))).toBe(true);

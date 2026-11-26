@@ -79,6 +79,22 @@ export async function commandWeb(
     )
       return { accountId: session.accountId };
     if (data.action === 'connect') {
+      const lock = 'monzo-qr-phone:' + session.expectedWaId;
+      await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtextextended(${lock},0))`;
+      if (
+        process.env.EVOLUTION_CHANNELS_ENABLED === 'true' &&
+        (await tx.evolutionSession.findFirst({
+          where: {
+            expectedWaId: session.expectedWaId,
+            OR: [{ desiredState: 'CONNECTED' }, { state: { not: 'DISCONNECTED' } }],
+          },
+          select: { accountId: true },
+        }))
+      )
+        throw new WebError(
+          409,
+          'Este número tiene otra conexión activa. Desconectala y esperá su confirmación.',
+        );
       const heartbeat = await tx.workerHeartbeat.findUnique({ where: { id: 'whatsapp-qr' } });
       if (!heartbeat || heartbeat.seenAt.getTime() < Date.now() - 45000)
         throw new WebError(409, 'El servicio QR del VPS está apagado o todavía no está instalado.');

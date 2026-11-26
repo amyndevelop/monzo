@@ -19,7 +19,7 @@ import { readConfig } from '../services/evolution-gateway/core.mjs';
 import { PROBE_PATH, secretPattern } from '../services/evolution-gateway/protocol.mjs';
 
 const keys = ['BETTER_AUTH_URL', 'BETTER_AUTH_SECRET', 'WHATSAPP_ENCRYPTION_KEY'];
-function privateFile(path) {
+export function privateFile(path) {
   const fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW);
   try {
     const stat = fstatSync(fd);
@@ -35,7 +35,7 @@ function privateFile(path) {
     closeSync(fd);
   }
 }
-function publishOnce(path, content) {
+export function publishOnce(path, content) {
   const temporary = path + '.' + randomBytes(6).toString('hex') + '.tmp';
   let fd;
   try {

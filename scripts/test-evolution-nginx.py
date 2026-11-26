@@ -4,6 +4,7 @@ import importlib.util
 import http.server
 import json
 import os
+import re
 from pathlib import Path
 import stat
 import ssl
@@ -202,6 +203,9 @@ class RealHttpsProbeTests(unittest.TestCase):
                 trusted = ssl.create_default_context(cafile=cert)
                 self.assertEqual(module.probe_local_https(3, address=server.server_address, context=trusted), (401, True))
                 self.assertEqual(server.seen[0], ('/v1/diagnostics', module.DOMAIN, None, b'{}'))
+                for path in ('/v1/channels/command', '/v1/channels/state'):
+                    self.assertEqual(module.probe_local_https(3, address=server.server_address, context=trusted, path=path), (401, True))
+                    self.assertEqual(server.seen[-1], (path, module.DOMAIN, None, b'{}'))
                 server.payload = b'<html>different authorization page</html>'
                 self.assertEqual(module.probe_local_https(3, address=server.server_address, context=trusted), (401, False))
                 with self.assertRaises(ssl.SSLCertVerificationError):
@@ -210,6 +214,28 @@ class RealHttpsProbeTests(unittest.TestCase):
                 server.shutdown()
                 server.server_close()
                 thread.join(5)
+
+
+class ChannelsProposalTests(unittest.TestCase):
+    def test_only_scoped_routes_are_published(self):
+        proposal = module.CHANNELS_PROPOSAL.read_text()
+        paths = set(re.findall(r'location = (\S+) \{', proposal))
+        self.assertEqual(paths, {'/v1/diagnostics', '/v1/channels/command', '/v1/channels/state'})
+        self.assertEqual(proposal.count('limit_except POST { deny all; }'), 3)
+        self.assertNotIn('/internal/', proposal)
+        self.assertNotIn('/instance/', proposal)
+        self.assertIn('location / { return 404; }', proposal)
+        self.assertIn('client_max_body_size 32k;', proposal)
+
+    def test_apply_channels_checks_every_route_and_preserves_default_proposal(self):
+        with patch.object(module.os, 'geteuid', return_value=0), patch.object(module, 'preflight') as preflight, patch.object(module, 'apply_site') as apply, patch.object(module, 'https_check') as check, patch.object(module, 'probe_local_https') as probe, patch.object(module.signal, 'signal'), patch.object(module.sys, 'argv', ['publish', '--channels', '--apply']):
+            apply.side_effect = lambda *args: args[5]() or Path('/private/fixture')
+            check.side_effect = lambda **kwargs: kwargs['probe'](1)
+            self.assertEqual(module.main(), 0)
+            preflight.assert_called_once_with(module.CHANNELS_PROPOSAL)
+            self.assertEqual(apply.call_args.args[0], module.CHANNELS_PROPOSAL)
+            self.assertEqual([call.kwargs['path'] for call in probe.call_args_list], ['/v1/diagnostics', '/v1/channels/command', '/v1/channels/state'])
+        self.assertEqual(module.PROPOSAL.name, 'nginx-onlineboosty.conf')
 
 
 if __name__ == "__main__":

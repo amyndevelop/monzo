@@ -5,8 +5,15 @@ import { Button } from '@/components/ui/button';
 import { whatsappRequest } from './http';
 import { QrConnections } from './qr-connections';
 import { EvolutionConnection } from './evolution-connection';
+import { EvolutionChannels } from './evolution-channels';
 import type { Channels } from '@/modules/whatsapp/types';
-export function ChannelsPanel({ tenantId }: { tenantId: string }) {
+export function ChannelsPanel({
+  tenantId,
+  evolutionEnabled = false,
+}: {
+  tenantId: string;
+  evolutionEnabled?: boolean;
+}) {
   const [data, setData] = useState<Channels | null>(null);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -46,8 +53,21 @@ export function ChannelsPanel({ tenantId }: { tenantId: string }) {
   }
   return (
     <div className="channels-panel">
-      <EvolutionConnection key={`evolution-${tenantId}`} tenantId={tenantId} />
-      <QrConnections key={tenantId} tenantId={tenantId} />
+      {evolutionEnabled && (
+        <EvolutionChannels key={`evolution-channels-${tenantId}`} tenantId={tenantId} />
+      )}
+      {evolutionEnabled ? (
+        <details className="evo-advanced">
+          <summary>Conexión anterior y diagnóstico</summary>
+          <EvolutionConnection key={`evolution-${tenantId}`} tenantId={tenantId} />
+          <QrConnections key={tenantId} tenantId={tenantId} />
+        </details>
+      ) : (
+        <>
+          <EvolutionConnection key={`evolution-${tenantId}`} tenantId={tenantId} />
+          <QrConnections key={tenantId} tenantId={tenantId} />
+        </>
+      )}
       <section className="channel-intro">
         <span className="icon-tile">
           <MessageCircle size={24} />

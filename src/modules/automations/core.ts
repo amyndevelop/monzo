@@ -4,6 +4,7 @@ import { flowSchema, flowIssues, effectiveVariables, type FlowGraph } from './de
 import { variableDefinition } from './variable-registry';
 import { pauseForHuman } from './runtime';
 import { FlowError } from './errors';
+import { evolutionSessionReady } from '../evolution/session-ready';
 export { FlowError } from './errors';
 const revision = z.number().int().min(0);
 export const mutationSchema = z.discriminatedUnion('action', [
@@ -23,7 +24,10 @@ export async function mutateFlow(
     const member = await tx.membership.findUnique({
       where: { tenantId_userId: { tenantId, userId } },
     });
-    const account = await tx.whatsappAccount.findFirst({ where: { id: accountId, tenantId } });
+    const account = await tx.whatsappAccount.findFirst({
+      where: { id: accountId, tenantId },
+      include: { evolutionSession: true },
+    });
     if (!member || member.role === 'MEMBER' || !account)
       throw new FlowError(403, 'No tenés acceso para editar este flujo.');
     const flow = await tx.automationFlow.findUnique({ where: { accountId } });
@@ -62,6 +66,9 @@ export async function mutateFlow(
       if (
         !account.enabled ||
         (account.provider === 'META' && !account.tokenEncrypted) ||
+        (account.provider === 'EVOLUTION' &&
+          (process.env.EVOLUTION_CHANNELS_ENABLED !== 'true' ||
+            !evolutionSessionReady(account.evolutionSession))) ||
         account.lastErrorCode === 'META_190'
       )
         throw new FlowError(409, 'Autorizá el número en Canales antes de activar el flujo.');
@@ -117,10 +124,14 @@ export async function controlConversation(
     });
     const account = await tx.whatsappAccount.findFirst({
       where: { id: conversation.accountId, tenantId },
+      include: { evolutionSession: true },
     });
     if (
       !account?.enabled ||
       (account.provider === 'META' && !account.tokenEncrypted) ||
+      (account.provider === 'EVOLUTION' &&
+        (process.env.EVOLUTION_CHANNELS_ENABLED !== 'true' ||
+          !evolutionSessionReady(account.evolutionSession))) ||
       account.lastErrorCode === 'META_190'
     )
       throw new FlowError(409, 'Autorizá el canal en Canales antes de reanudar el flujo.');

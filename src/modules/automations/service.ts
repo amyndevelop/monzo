@@ -1,4 +1,5 @@
 import 'server-only';
+import { evolutionSessionReady } from '../evolution/session-ready';
 import { registryRows, mutateVariable } from './variable-registry';
 import { variableDefinition } from './variable-registry';
 import { z } from 'zod';
@@ -33,6 +34,15 @@ export async function getFlow(tenantId: string, accountId: string) {
       lastErrorCode: true,
       provider: true,
       webSession: { select: { state: true, desiredState: true, leaseUntil: true } },
+      evolutionSession: {
+        select: {
+          state: true,
+          desiredState: true,
+          expectedWaId: true,
+          connectedWaId: true,
+          lastSeenAt: true,
+        },
+      },
     },
   });
   if (!account) throw new RequestError(403, 'No tenés acceso a este número.');
@@ -70,7 +80,11 @@ export async function getFlow(tenantId: string, accountId: string) {
     canEdit: membership.role !== 'MEMBER',
     channelReady:
       account.enabled &&
-      (account.provider === 'BAILEYS' || Boolean(account.tokenEncrypted)) &&
+      (account.provider === 'BAILEYS' ||
+        (account.provider === 'EVOLUTION'
+          ? process.env.EVOLUTION_CHANNELS_ENABLED === 'true' &&
+            evolutionSessionReady(account.evolutionSession)
+          : Boolean(account.tokenEncrypted))) &&
       account.lastErrorCode !== 'META_190',
     processorReady:
       account.provider === 'BAILEYS'
@@ -80,9 +94,14 @@ export async function getFlow(tenantId: string, accountId: string) {
             account.webSession.leaseUntil &&
             account.webSession.leaseUntil.getTime() > Date.now(),
           )
-        : processorMode() === 'qstash'
-          ? qstashConfigured()
-          : Boolean(heartbeat?.outboundEnabled && heartbeat.seenAt > new Date(Date.now() - 45000)),
+        : account.provider === 'EVOLUTION'
+          ? process.env.EVOLUTION_CHANNELS_ENABLED === 'true' &&
+            evolutionSessionReady(account.evolutionSession)
+          : processorMode() === 'qstash'
+            ? qstashConfigured()
+            : Boolean(
+                heartbeat?.outboundEnabled && heartbeat.seenAt > new Date(Date.now() - 45000),
+              ),
   };
 }
 async function failure<T>(work: () => Promise<T>) {

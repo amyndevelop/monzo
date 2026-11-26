@@ -100,6 +100,7 @@ const network: EvolutionTransport = async (url, init) => {
   dispatcher ??= new EnvHttpProxyAgent();
   return httpFetch(url, { ...init, dispatcher });
 };
+export { network as evolutionNetwork };
 const reportSchema = z
   .object({
     protocol: z.literal(PROTOCOL),

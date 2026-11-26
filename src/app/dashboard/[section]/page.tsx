@@ -57,7 +57,10 @@ export default async function Section({
         </div>
       </div>
       {section === 'canales' ? (
-        <ChannelsPanel tenantId={context.tenant.id} />
+        <ChannelsPanel
+          tenantId={context.tenant.id}
+          evolutionEnabled={process.env.EVOLUTION_CHANNELS_ENABLED === 'true'}
+        />
       ) : section === 'analiticas' ? (
         <AnalyticsPanel key={context.tenant.id} tenantId={context.tenant.id} />
       ) : section === 'agentes-ia' ? (

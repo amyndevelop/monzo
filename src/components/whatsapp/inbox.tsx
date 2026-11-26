@@ -38,6 +38,16 @@ const labels: Record<string, string> = {
   RECEIVED: 'Recibido',
 };
 const errorLabels: Record<string, string> = {
+  EVOLUTION_CHANNEL_NOT_CONNECTED:
+    'La conexión cambió antes del envío. Revisá el número en Canales.',
+  EVOLUTION_PROVIDER_REJECTED:
+    'WhatsApp rechazó este envío. Revisá la conexión antes de volver a intentarlo.',
+  EVOLUTION_COMMAND_EXPIRED: 'La solicitud venció antes de enviarse.',
+  EVOLUTION_GENERATION_CHANGED: 'El número volvió a vincularse antes del envío.',
+  EVOLUTION_RECONNECTED: 'El número volvió a vincularse antes del envío.',
+  EVOLUTION_DISCONNECTED: 'Se desconectó el número antes del envío.',
+  EVOLUTION_RESULT_UNKNOWN: 'No recibimos la confirmación del proveedor.',
+  EVOLUTION_PROCESS_INTERRUPTED: 'El servicio se interrumpió antes de confirmar el resultado.',
   TEMPLATE_NOT_APPROVED:
     'Meta pausó o dejó de aprobar esta plantilla. Elegí otra o actualizá el catálogo.',
   TEMPLATE_CHANGED:
@@ -252,7 +262,7 @@ export function Inbox({
     }
   }
   const openWindow = Boolean(thread?.canReply);
-  const qrChannel = thread?.conversation.account.provider === 'BAILEYS';
+  const qrChannel = ['BAILEYS', 'EVOLUTION'].includes(thread?.conversation.account.provider ?? '');
   const audioAttachment = Boolean(
     attachment &&
     (attachment.type.startsWith('audio/') || /\.(mp3|ogg|m4a|aac)$/i.test(attachment.name)),
@@ -514,13 +524,16 @@ export function Inbox({
                   </footer>
                   {message.status === 'UNKNOWN' && (
                     <small>
-                      Meta no confirmó el resultado. Revisá la conversación antes de intentar otro
-                      envío.
+                      {qrChannel ? 'WhatsApp' : 'Meta'} no confirmó el resultado. Revisá la
+                      conversación antes de intentar otro envío.
                     </small>
                   )}
                   {message.errorCode && (
                     <small title={message.errorCode}>
-                      {errorLabels[message.errorCode] ?? message.errorCode}
+                      {errorLabels[message.errorCode] ??
+                        (qrChannel
+                          ? 'La conexión necesita revisión antes de volver a enviar.'
+                          : message.errorCode)}
                     </small>
                   )}
                 </article>

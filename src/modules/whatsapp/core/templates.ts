@@ -45,7 +45,7 @@ function templateAccount(account: {
   tokenEncrypted: string | null;
   lastErrorCode: string | null;
 }) {
-  if (account.provider === 'BAILEYS')
+  if (account.provider && account.provider !== 'META')
     throw new TemplateError(
       409,
       'UNSUPPORTED_PROVIDER',

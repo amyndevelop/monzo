@@ -1,4 +1,7 @@
 import 'server-only';
+import { after } from 'next/server';
+import { dispatchEvolutionAccount } from '../evolution/outbound';
+import { evolutionSessionReady } from '../evolution/session-ready';
 import { pauseForHuman } from '../automations/runtime';
 import { stateSchema } from '../automations/definition';
 import { z } from 'zod';
@@ -45,6 +48,7 @@ export async function channelStatus(tenantId: string) {
           where: {
             tenantId,
             direction: 'OUTBOUND',
+            account: { provider: 'META' },
             OR: [
               { status: 'QUEUED', ...pendingWhere },
               { status: 'SENDING', attemptedAt: { lt: stale } },
@@ -95,7 +99,7 @@ export async function connectAccount(tenantId: string, input: unknown) {
   });
   if (previous && previous.tenantId !== tenantId)
     throw new RequestError(409, 'Este número no está disponible para esta empresa.');
-  if (previous?.provider === 'BAILEYS')
+  if (previous && previous.provider !== 'META')
     throw new RequestError(409, 'Este identificador pertenece a una conexión QR.');
   let identity: { displayPhone: string; displayName: string };
   try {
@@ -194,7 +198,12 @@ export async function recoverPendingJobs(tenantId: string) {
     if (actor?.role !== 'OWNER') throw new AccessError(403);
     const stale = new Date(Date.now() - 120000);
     await tx.message.updateMany({
-      where: { tenantId, status: 'SENDING', attemptedAt: { lt: stale } },
+      where: {
+        tenantId,
+        status: 'SENDING',
+        attemptedAt: { lt: stale },
+        account: { provider: 'META' },
+      },
       data: { status: 'UNKNOWN', errorCode: 'WORKER_INTERRUPTED' },
     });
     const pendingWhere = { OR: [{ jobPublishedAt: null }, { jobPublishedAt: { lt: stale } }] };
@@ -206,7 +215,13 @@ export async function recoverPendingJobs(tenantId: string) {
         orderBy: { createdAt: 'asc' },
       }),
       tx.message.findMany({
-        where: { tenantId, status: 'QUEUED', direction: 'OUTBOUND', ...pendingWhere },
+        where: {
+          tenantId,
+          status: 'QUEUED',
+          direction: 'OUTBOUND',
+          account: { provider: 'META' },
+          ...pendingWhere,
+        },
         select: { id: true },
         take: 50,
         orderBy: { createdAt: 'asc' },
@@ -294,6 +309,15 @@ async function scopedConversation(tenantId: string, conversationId: string) {
           displayPhone: true,
           provider: true,
           webSession: { select: { leaseUntil: true, state: true, desiredState: true } },
+          evolutionSession: {
+            select: {
+              state: true,
+              desiredState: true,
+              expectedWaId: true,
+              connectedWaId: true,
+              lastSeenAt: true,
+            },
+          },
         },
       },
     },
@@ -400,7 +424,12 @@ export async function getThread(tenantId: string, conversationId: string, before
             conversation.account.webSession.leaseUntil &&
             conversation.account.webSession.leaseUntil.getTime() > Date.now(),
           )
-        : withinWindow(conversation.lastInboundAt)),
+        : conversation.account.provider === 'EVOLUTION'
+          ? Boolean(
+              process.env.EVOLUTION_CHANNELS_ENABLED === 'true' &&
+              evolutionSessionReady(conversation.account.evolutionSession),
+            )
+          : conversation.account.provider === 'META' && withinWindow(conversation.lastInboundAt)),
   };
 }
 export async function enqueueMessage(tenantId: string, conversationId: string, input: unknown) {
@@ -432,11 +461,14 @@ export async function enqueueMessage(tenantId: string, conversationId: string, i
     }
     const conversation = await tx.conversation.findFirst({
       where: { id: conversationId, tenantId },
-      include: { account: { include: { webSession: true } } },
+      include: { account: { include: { webSession: true, evolutionSession: true } } },
     });
     if (!conversation) throw new AccessError(403);
     if (
       !conversation.account.enabled ||
+      (conversation.account.provider === 'EVOLUTION' &&
+        (process.env.EVOLUTION_CHANNELS_ENABLED !== 'true' ||
+          !evolutionSessionReady(conversation.account.evolutionSession))) ||
       (conversation.account.provider === 'META' && !conversation.account.tokenEncrypted) ||
       (conversation.account.provider === 'BAILEYS' &&
         (!conversation.account.webSession?.leaseUntil ||
@@ -479,6 +511,20 @@ export async function enqueueMessage(tenantId: string, conversationId: string, i
     return message;
   });
   if (saved.status === 'QUEUED') {
+    const account = await getDb().whatsappAccount.findFirst({
+      where: { tenantId, conversations: { some: { id: conversationId, tenantId } } },
+      select: { id: true, provider: true },
+    });
+    if (account?.provider === 'EVOLUTION') {
+      after(async () => {
+        try {
+          await dispatchEvolutionAccount(tenantId, account.id);
+        } catch {
+          console.error('Evolution outbound scheduling deferred.');
+        }
+      });
+      return presentMessage(saved);
+    }
     try {
       await dispatchJobs(getDb(), [{ kind: 'outbox', id: saved.id }]);
     } catch {
