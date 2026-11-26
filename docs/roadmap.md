@@ -62,3 +62,5 @@ No son fechas de entrega ni funciones disponibles. No se inicia otra fase autom�
 ## Ampliación BOOSTIFY · Plan nuevo en ocho etapas
 
 La auditoría conserva las funciones existentes y distingue el plan nuevo de las fases históricas anteriores. La infraestructura y conexión técnica de Etapa 2 quedaron verificadas el 26/11/2026: Evolution en VPS, gateway HTTPS autorizado en `onlineboosty.com.ar` y retorno HMAC correcto a MONZO Preview de `feat/evolution-integration`. La rama permanece separada de `main`. [Alcance, pruebas, instalación y límites](evolution-stage-2.md). El QR y mensajes mediante Evolution corresponden a la Etapa 3, con base Preview aislada antes de realizar escrituras; pedidos, pagos y finanzas se mantienen para las etapas siguientes.
+
+La [Etapa 3](evolution-stage-3.md) se inicia en `feat/evolution-conversations` con el adaptador privado de instancias probado localmente. El aislamiento de la base Preview está pendiente de confirmar; vinculación, eventos durables y conversaciones Evolution aún no están habilitados.
