@@ -413,6 +413,24 @@ test('inspección del retorno: distingue secreto ausente, autorización, redirec
     assert.equal(result.httpStatus, status);
     assert.equal(JSON.stringify(result).includes('private-error'), false);
   }
+  for (const reason of [
+    'MISSING',
+    'QUOTED',
+    'WHITESPACE',
+    'ASSIGNMENT',
+    'INVALID_FORMAT',
+    'private-unknown-reason',
+  ]) {
+    const result = await inspectCallback(r.config, async () =>
+      Response.json({ error: 'NOT_CONFIGURED', reason }, { status: 503 }),
+    );
+    assert.equal(result.code, 'NOT_CONFIGURED');
+    assert.equal(
+      result.configurationReason,
+      reason === 'private-unknown-reason' ? undefined : reason,
+    );
+    assert.equal(JSON.stringify(result).includes('private'), false);
+  }
   let calls = 0;
   const redirect = await inspectCallback(r.config, async (url, init) => {
     calls++;

@@ -12,7 +12,19 @@ export async function evolutionProbe(request: Request, secret: string | undefine
       status,
       headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' },
     });
-  if (!secret || !secretPattern.test(secret)) return respond(503, { error: 'NOT_CONFIGURED' });
+  if (!secret || !secretPattern.test(secret)) {
+    // Bounded configuration hints only: never expose the value, its length or a fingerprint.
+    const reason = !secret
+      ? 'MISSING'
+      : /["'“”‘’]/.test(secret)
+        ? 'QUOTED'
+        : /\s/.test(secret)
+          ? 'WHITESPACE'
+          : secret.includes('=')
+            ? 'ASSIGNMENT'
+            : 'INVALID_FORMAT';
+    return respond(503, { error: 'NOT_CONFIGURED', reason });
+  }
   const headers = {
     timestamp: request.headers.get('x-monzo-timestamp'),
     nonce: request.headers.get('x-monzo-nonce'),

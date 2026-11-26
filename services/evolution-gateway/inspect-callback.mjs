@@ -16,6 +16,13 @@ const networkCodes = new Set([
   'DEPTH_ZERO_SELF_SIGNED_CERT',
   'ERR_TLS_CERT_ALTNAME_INVALID',
 ]);
+const configurationReasons = new Set([
+  'MISSING',
+  'QUOTED',
+  'WHITESPACE',
+  'ASSIGNMENT',
+  'INVALID_FORMAT',
+]);
 
 // Operator-only diagnostic: read the running gateway's environment, never print its values.
 export async function inspectCallback(config, transport = fetch) {
@@ -57,7 +64,14 @@ export async function inspectCallback(config, transport = fetch) {
                 sameSecret(data?.proof, responseProof(config.webhookSecret, challenge, nonce))
               ? 'OK'
               : 'INVALID_RESPONSE';
-    return { code, httpStatus: response.status, durationMs: Date.now() - started };
+    return {
+      code,
+      httpStatus: response.status,
+      durationMs: Date.now() - started,
+      ...(code === 'NOT_CONFIGURED' && configurationReasons.has(data?.reason)
+        ? { configurationReason: data.reason }
+        : {}),
+    };
   } catch (error) {
     const code =
       error?.name === 'TimeoutError'
@@ -77,6 +91,8 @@ if (!process.argv[1] || resolve(process.argv[1]) === fileURLToPath(import.meta.u
     const result = await inspectCallback(config);
     console.log('HTTP del Preview:', result.httpStatus ?? 'sin respuesta');
     console.log('Resultado:', result.code);
+    if (result.configurationReason)
+      console.log('Motivo de configuración:', result.configurationReason);
     console.log('Duración (ms):', result.durationMs);
     if (result.code === 'NOT_CONFIGURED')
       console.log(
