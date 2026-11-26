@@ -1,6 +1,8 @@
 # Evolution · Etapa 2: infraestructura y diagnóstico autenticado
 
-Estado: preparación en rama independiente `feat/evolution-integration`, desde `92e435032889a571f83a98d8a1c04aa49e9807fa`. No implica instalación en el VPS ni publicación en Vercel. Dominio elegido: **https://onlineboosty.com.ar**, raíz del dominio, sin subdominio. Su contenido actual se reemplazará cuando el usuario apruebe el despliegue.
+Estado al 26 de noviembre de 2026: **infraestructura en VPS y conexión técnica con MONZO Preview verificadas por el usuario**. Trabajo en rama independiente `feat/evolution-integration`, desde `92e435032889a571f83a98d8a1c04aa49e9807fa`. El gateway está publicado con la aprobación del usuario en **https://onlineboosty.com.ar**, raíz del dominio. La rama sigue separada de `main`; no se declara publicada la integración en MONZO Production ni vinculado un número Evolution.
+
+La comprobación completa desde el VPS confirmó Evolution, su credencial interna y el retorno HMAC a MONZO. Los comandos y relatos siguientes documentan la preparación y el diagnóstico previos; la evidencia final está en [Conexión técnica confirmada](#conexión-técnica-confirmada). Antes de probar operaciones de Etapa 3 en la interfaz, confirmar la base aislada y el origen de autenticación del Preview.
 
 ## Operación en el VPS endurecido
 
@@ -270,3 +272,11 @@ El usuario confirmó después mediante capturas los tres nombres de variables en
 El probe mantiene el error HTTP 503 y agrega exclusivamente un motivo permitido: `MISSING`, `QUOTED`, `WHITESPACE`, `ASSIGNMENT` o `INVALID_FORMAT`. No devuelve el valor, longitud, hash ni fragmentos del secreto. La inspección por stdin informa ese motivo cuando el nuevo Preview está Ready y omite razones desconocidas. Se conserva el rechazo estricto: no quitar comillas o espacios automáticamente, aceptar otro formato ni regenerar claves. Las pruebas del probe cubren el formato y mantienen autenticación y prueba de respuesta HMAC para valores válidos. Ejecutar con `node --import tsx --test --test-isolation=none scripts/test-evolution-probe.mjs services/evolution-gateway/test/*.test.mjs` (26 pruebas).
 
 TypeScript, lint de los archivos modificados y build Webpack pasaron. Además, el servidor Next compilado se inició localmente con tres configuraciones runtime independientes: secreto vacío → 503/MISSING, secreto entre comillas → 503/QUOTED y secreto válido → 200 con prueba HMAC verificada. El endpoint no requiere conexión ni escrituras de base de datos. Esta comprobación confirma la lectura runtime del código compilado local; no prueba qué valor está recibiendo Vercel.
+
+## Conexión técnica confirmada
+
+El 26 de noviembre de 2026 el usuario actualizó su checkout del VPS a `b6a0917` y ejecutó la inspección dentro del gateway existente. El destino fijo fue `https://monzo-v-git-feat-evolution-integration-arqen2.vercel.app`; el resultado fue **HTTP 200, OK, duración 1038 ms y firma de respuesta válida**. Después repitió el diagnóstico completo mediante `scripts/check-evolution-connection.mjs` y confirmó **Retorno HMAC a MONZO: OK** y **Conexión técnica completa comprobada**, cuyo éxito también exige Evolution y credencial interna correctos. El comando terminó en éxito sin enviar mensajes ni modificar la base de MONZO.
+
+Esta evidencia cierra la comprobación real de HTTPS, credencial del gateway, acceso a Evolution y retorno firmado al Preview protegido. No se atribuye la resolución del 503 a un cambio concreto de valor o alcance que no se haya observado. No exige otra rotación de claves, reinstalación ni repetición de los mismos diagnósticos sin nuevos cambios o fallos.
+
+La siguiente etapa es integrar el proveedor Evolution con vinculación QR, estados de conexión, recepción durable, envío y recuperación de sesión, conservando los proveedores existentes y el chat a pantalla completa. Antes de realizar escrituras o iniciar sesión para pruebas en el Preview, confirmar su base aislada y origen de autenticación. El gateway público de esta etapa continúa limitado a diagnóstico; las rutas de instancias y eventos requieren implementación, pruebas y publicación explícita de su alcance. La prueba de vinculación/restauración con un número secundario y los respaldos cifrados siguen pendientes antes de incorporar clientes reales.

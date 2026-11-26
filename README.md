@@ -90,6 +90,6 @@ El logo proviene del PDF vectorial original, sin redibujar ni recolorear; las 20
 
 Conector opcional no oficial con servicio persistente para VPS Ubuntu/Docker. Primera entrega de texto individual y árboles numerados; no importa historial previo ni grupos y no ofrece adjuntos/plantillas Meta. Requiere la migración combinada y el despliegue del servicio antes de vincular un teléfono real. La interfaz sigue en Vercel. Instrucciones y límites en [docs/whatsapp-qr-deploy.md](docs/whatsapp-qr-deploy.md).
 
-## Preparación de Evolution en VPS
+## Evolution en VPS
 
-La ampliación en rama `feat/evolution-integration` incorpora infraestructura privada y diagnóstico autenticado, con el dominio raíz `onlineboosty.com.ar`. Ver [Etapa 2: alcance, pruebas y preparación de despliegue](docs/evolution-stage-2.md). Todavía no incorpora números ni mensajes mediante Evolution; no requiere una migración de MONZO.
+La ampliación en rama `feat/evolution-integration` incorpora infraestructura privada y diagnóstico autenticado, con el dominio raíz `onlineboosty.com.ar`. La instalación en el VPS y conexión técnica con MONZO Preview, incluido el retorno HMAC, fueron verificadas el 26/11/2026. Ver [Etapa 2: alcance, pruebas y despliegue](docs/evolution-stage-2.md). Todavía no incorpora números ni mensajes mediante Evolution; no requiere una migración de MONZO.
