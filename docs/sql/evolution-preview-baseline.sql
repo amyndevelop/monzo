@@ -17,6 +17,15 @@ BEGIN
  FOR table_row IN SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind IN ('r','p') ORDER BY c.relname COLLATE "C" LOOP
   EXECUTE format('LOCK TABLE public.%I IN SHARE ROW EXCLUSIVE MODE',table_row.relname);
  END LOOP;
+ IF EXISTS (
+  SELECT 1 FROM pg_constraint k JOIN pg_class c ON c.oid=k.conrelid JOIN pg_namespace n ON n.oid=c.relnamespace
+  LEFT JOIN pg_attribute a ON a.attrelid=c.oid AND a.attnum=k.conkey[1]
+  WHERE n.nspname='public' AND k.contype='n' AND (
+   NOT k.convalidated OR k.condeferrable OR k.condeferred OR
+   to_jsonb(k)->>'conenforced' IS DISTINCT FROM 'true' OR
+   cardinality(k.conkey) IS DISTINCT FROM 1 OR NOT COALESCE(a.attnotnull,false)
+  )
+ ) THEN RAISE EXCEPTION 'MONZO: restricciones NOT NULL sin validar o incompatibles. No se registro historial.'; END IF;
  WITH items AS (
  SELECT 'relations' AS kind, jsonb_build_array(c.relname,c.relkind,c.relpersistence,c.relrowsecurity,c.relforcerowsecurity) AS item
  FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind IN ('r','p','v','m','S','f')
@@ -27,7 +36,7 @@ BEGIN
  WHERE n.nspname='public' AND c.relkind IN ('r','p','v','m','f') AND a.attnum>0 AND NOT a.attisdropped
  UNION ALL
  SELECT 'constraints',jsonb_build_array(c.relname,k.conname,k.contype,k.convalidated,k.condeferrable,k.condeferred,pg_get_constraintdef(k.oid,false))
- FROM pg_constraint k JOIN pg_class c ON c.oid=k.conrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public'
+ FROM pg_constraint k JOIN pg_class c ON c.oid=k.conrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND k.contype<>'n'
  UNION ALL
  SELECT 'indexes',jsonb_build_array(c.relname,i.relname,x.indisunique,x.indisprimary,x.indisvalid,x.indisready,x.indnullsnotdistinct,pg_get_indexdef(x.indexrelid))
  FROM pg_index x JOIN pg_class c ON c.oid=x.indrelid JOIN pg_class i ON i.oid=x.indexrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public'
