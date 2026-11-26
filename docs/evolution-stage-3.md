@@ -1,6 +1,6 @@
 # Evolution · Etapa 3: QR y conversaciones
 
-Estado al 26/11/2026: desarrollo en **feat/evolution-conversations**, desde `4f78ceb`. El usuario ya accede al Preview y confirmó Neon con doce migraciones. Están implementados Canales con QR y acciones de propietario, receptor firmado y envío durable de texto desde Conversaciones. Pasaron los recorridos locales con proveedor controlado en escritorio y móvil. El VPS conserva todavía su stack y retorno de diagnóstico de Etapa 2; no se escaneó un teléfono ni se enviaron mensajes reales. **La fase 3 no está completa**: faltan la instalación/prueba física de esta entrega, adjuntos de Evolution e importación del historial anterior.
+Estado al 26/11/2026: desarrollo en **feat/evolution-conversations**, desde `4f78ceb`. El usuario ya accede al Preview y confirmó Neon con doce migraciones. La entrega `fb1bac6` está instalada en el VPS rootless, con las rutas HTTPS de canales publicadas y retorno firmado al Preview de conversaciones. **Prueba física confirmada por el usuario:** renovación de QR vencido, teléfono conectado y comprobado, recepción del texto enviado desde otro número y respuesta desde MONZO recibida en WhatsApp. No se infieren de esa confirmación recibos de lectura, automatizaciones, persistencia tras reiniciar ni adjuntos. **La fase 3 no está completa**: faltan esas comprobaciones de recuperación, adjuntos de Evolution e importación del historial anterior. Production/main no se modificó.
 
 ## Entrega actual: QR y texto
 
@@ -8,9 +8,17 @@ Canales permite preparar hasta tres números por empresa, generar/renovar el QR,
 
 El despachador selecciona explícitamente EVOLUTION, conserva el ID del proveedor antes del RPC y revalida identidad, sesión, rol y pausa del bot al reclamar. Mantiene orden por cuenta; un resultado incierto no vuelve a enviarse automáticamente. Los recibos pueden reconciliarlo. El envío desde el chat se agenda después de responder y los heartbeats vuelven a buscar pendientes, sin depender de una llamada QStash hacia un Preview protegido. Un SENDING abandonado pasa a UNKNOWN con su ID original. El chat mantiene pantalla completa y compositor; no ofrece plantillas de Meta ni el adjuntador todavía no implementado para este proveedor. La intervención humana desde el teléfono pausa la automatización existente.
 
-Los comandos de preparación y publicación están en [la guía de prueba del Preview](evolution-channels-rollout.md). Crean un archivo privado separado, conservan las claves y configuración de Etapa 2 y generan una clave independiente para el spool del VPS. El publicador puede seleccionar las rutas acotadas de canales y verificar sus tres rechazos sin credencial, con respaldo y rollback automático. **Estos pasos no se ejecutaron en el VPS desde esta conversación.** La bandera continúa deshabilitada por defecto y no hay otra migración además de la número doce ya aplicada.
+Los comandos de preparación y publicación están en [la guía de prueba del Preview](evolution-channels-rollout.md). El usuario confirmó su ejecución: archivo privado separado, comprobación firmada HTTP 200/OK, cuatro contenedores healthy, gateway 0.2.0, nuevo volumen del spool, publicación HTTPS y diagnóstico completo con Evolution/retorno HMAC OK. El respaldo del vhost anterior es `/var/backups/monzo-evolution-nginx/cambio-9dfyopza`. Las claves no se compartieron. La bandera está habilitada en el Preview de esta rama; conserva false como valor predeterminado del código/Compose. No hay otra migración además de la número doce ya aplicada.
 
-Verificación local: seis recorridos de navegador (tres en escritorio y móvil) hasta PostgreSQL real, firmas, spool y UI, con proveedor controlado; 25 pruebas de acciones/receptor/despacho; pruebas del gateway y del publicador HTTPS. Las capturas de fixture se revisaron visualmente, sin desbordamiento horizontal y con chat a pantalla completa. Esto no sustituye la prueba física ni demuestra disponibilidad de WhatsApp real.
+Verificación local: seis recorridos de navegador (tres en escritorio y móvil) hasta PostgreSQL real, firmas, spool y UI, con proveedor controlado; 25 pruebas de acciones/receptor/despacho; pruebas del gateway y del publicador HTTPS. Las capturas de fixture se revisaron visualmente, sin desbordamiento horizontal y con chat a pantalla completa. La prueba física posterior de QR/texto fue ejecutada y confirmada por el usuario; el agente no accedió por SSH al VPS ni inspeccionó su teléfono.
+
+### Revisión del siguiente bloque
+
+Se pueden reutilizar las burbujas de imagen/documento y el reproductor de audio, el límite de 3 MiB, la inspección del contenido real, los nombres seguros y las respuestas privadas con rangos. Hoy el adaptador Evolution no descarga adjuntos, la tabla `blobs` del spool no tiene operaciones de almacenamiento y Nginx no publica una ruta de archivos. Quitar la restricción del adjuntador no implementaría ese transporte.
+
+El proveedor fijado ofrece `chat/getBase64FromMediaMessage` por instancia y permite recuperar el mensaje desde su clave. La descarga debe resolverse únicamente dentro de la instancia/empresa/generación comprobadas, sin aceptar URLs del navegador o del evento, y guardar bytes cifrados antes de anunciar disponibilidad en MONZO. Su implementación actual acumula el medio en un buffer sin un límite explícito en ese método: limitar solo la respuesta JSON en el gateway no basta para acotar el uso de memoria del proveedor. Antes de habilitarlo hay que resolver ese límite, los formatos reales, cuotas/retención, recuperación y la comprobación de permisos al servir los bytes. No se habilitó ninguna ruta nueva de archivos por esta revisión.
+
+`fetchMessages` filtra por instancia y pagina lo que ya está guardado en Evolution. No demuestra que exista todo el historial anterior del celular. La importación deberá mostrar alcance/progreso real, conservar deduplicación y `history=true`, sin disparar automatizaciones o pausas humanas por mensajes antiguos. La conexión actual mantiene `syncFullHistory=false`; esta revisión no cambia la sesión ni solicita un historial masivo.
 
 Las secciones siguientes conservan el registro de preparación y validaciones sucesivas; las limitaciones de cada incremento describen su estado en ese momento.
 
@@ -172,8 +180,8 @@ node scripts/test-evolution-send-id-patch.mjs /tmp/monzo-evolution-main-unpatche
 
 ## Pendientes actuales
 
-1. Ejecutar la guía de instalación exclusivamente en el Preview y motor rootless propios; verificar el retorno firmado del nuevo destino y las rutas HTTPS antes de generar un QR.
-2. Comprobar con un número secundario el escaneo físico, recepción/respuesta de texto, recibos, reconexión/persistencia tras reiniciar y pausa humana del bot. La entrega local de texto está comprobada; el comportamiento real de WhatsApp sigue pendiente.
+1. Instalación y prueba física de QR/texto confirmadas por el usuario en el Preview y motor rootless propios. Conservar este entorno separado de Production.
+2. Comprobar recibos, reconexión/persistencia tras reiniciar y pausa humana del bot. El escaneo, recepción y respuesta de texto ya funcionaron en WhatsApp real; todavía no hay confirmación de esas otras comprobaciones.
 3. Incorporar adjuntos privados y acotados e historial anterior, con mensajes claros de disponibilidad y sin anunciar descargas hasta tener los bytes verificados. Hoy solo funciona el texto del nuevo proveedor; las funciones de Meta conservan su alcance.
 4. Completar pruebas de recuperación y carga, backups cifrados y restauración en aislamiento antes del piloto principal de BOOSTIFY. Las pruebas de permisos cruzados, móvil/escritorio y teclado de la entrega actual ya pasaron localmente.
 
