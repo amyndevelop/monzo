@@ -1,6 +1,6 @@
 # Evolution · Etapa 3: QR y conversaciones
 
-Estado al 26/11/2026: desarrollo en **feat/evolution-conversations**, desde `4f78ceb`. El usuario ya accede al Preview y confirmó Neon con doce migraciones. La entrega `fb1bac6` está instalada en el VPS rootless, con las rutas HTTPS de canales publicadas y retorno firmado al Preview de conversaciones. **Prueba física confirmada por el usuario:** renovación de QR vencido, teléfono conectado y comprobado, recepción del texto enviado desde otro número y respuesta desde MONZO recibida en WhatsApp. No se infieren de esa confirmación recibos de lectura, automatizaciones, persistencia tras reiniciar ni adjuntos. **La fase 3 no está completa**: faltan esas comprobaciones de recuperación, adjuntos de Evolution e importación del historial anterior. Production/main no se modificó.
+Estado al 26/11/2026: desarrollo en **feat/evolution-conversations**, desde `4f78ceb`. El usuario ya accede al Preview y confirmó Neon con doce migraciones. La entrega `fb1bac6` está instalada en el VPS rootless, con las rutas HTTPS de canales publicadas y retorno firmado al Preview de conversaciones. **Prueba física confirmada por el usuario:** renovación de QR vencido, teléfono conectado y comprobado, recepción del texto enviado desde otro número y respuesta desde MONZO recibida en WhatsApp. Después reinició únicamente Evolution/gateway, ambos volvieron healthy y confirmó que conexión/mensajes seguían funcionando. Esto comprueba persistencia tras reiniciar esos procesos, no tras reiniciar todo el VPS. No se infieren recibos de lectura, automatizaciones físicas ni adjuntos. **La fase 3 no está completa**: faltan esas comprobaciones y recuperación ampliada, adjuntos de Evolution e importación del historial anterior. El usuario priorizó ahora automatizaciones de servicios/precios con menús y reglas; ver [el incremento del constructor](automation-service-menu.md). Production/main no se modificó.
 
 ## Entrega actual: QR y texto
 
@@ -181,7 +181,7 @@ node scripts/test-evolution-send-id-patch.mjs /tmp/monzo-evolution-main-unpatche
 ## Pendientes actuales
 
 1. Instalación y prueba física de QR/texto confirmadas por el usuario en el Preview y motor rootless propios. Conservar este entorno separado de Production.
-2. Comprobar recibos, reconexión/persistencia tras reiniciar y pausa humana del bot. El escaneo, recepción y respuesta de texto ya funcionaron en WhatsApp real; todavía no hay confirmación de esas otras comprobaciones.
+2. Comprobar recibos, recuperación ampliada y pausa humana del bot. El escaneo, recepción/respuesta y persistencia tras reiniciar Evolution/gateway ya funcionaron en WhatsApp real. El bot tiene pruebas locales con el receptor/gateway reales de test y proveedor controlado; su publicación y prueba física siguen pendientes del usuario.
 3. Incorporar adjuntos privados y acotados e historial anterior, con mensajes claros de disponibilidad y sin anunciar descargas hasta tener los bytes verificados. Hoy solo funciona el texto del nuevo proveedor; las funciones de Meta conservan su alcance.
 4. Completar pruebas de recuperación y carga, backups cifrados y restauración en aislamiento antes del piloto principal de BOOSTIFY. Las pruebas de permisos cruzados, móvil/escritorio y teclado de la entrega actual ya pasaron localmente.
 

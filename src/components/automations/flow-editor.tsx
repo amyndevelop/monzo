@@ -31,6 +31,7 @@ import {
 import { InboxNavigationToggle } from '@/components/platform/inbox-navigation';
 import { WorkspaceDrawer } from './workspace-drawer';
 import { FlowSimulator } from './simulator';
+import { ServiceMenuBuilder } from './service-menu-builder';
 type FlowData = {
   variables: VariableDefinition[];
   flow: {
@@ -76,7 +77,9 @@ export function AutomationPanel({ tenantId }: { tenantId: string }) {
     )
       .then((data) => {
         setAccounts(data);
-        setSelected(data.accounts[0]?.id ?? '');
+        setSelected(
+          data.accounts.find((account) => account.enabled)?.id ?? data.accounts[0]?.id ?? '',
+        );
       })
       .catch((error) => {
         if (!controller.signal.aborted)
@@ -218,6 +221,12 @@ function FlowEditor({
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [simulator, setSimulator] = useState(false);
+  const [serviceMenuOpen, setServiceMenuOpen] = useState(false);
+  const [serviceMenuOpening, setServiceMenuOpening] = useState(0);
+  function openServiceMenu() {
+    setServiceMenuOpening((value) => value + 1);
+    setServiceMenuOpen(true);
+  }
   const [attempt, setAttempt] = useState(0);
   const base = `/api/workspaces/${tenantId}/automations/${accountId}`;
   useEffect(() => {
@@ -459,6 +468,27 @@ function FlowEditor({
           </p>
         )}
       </WorkspaceDrawer>
+      <WorkspaceDrawer
+        open={serviceMenuOpen}
+        onClose={() => setServiceMenuOpen(false)}
+        title="Crear menú de servicios y precios"
+      >
+        <ServiceMenuBuilder
+          opening={serviceMenuOpening}
+          replaceExisting={graph.nodes.length > 0}
+          onCancel={() => setServiceMenuOpen(false)}
+          onCreate={(next) => {
+            edit({ ...next, variables: graph.variables, schemaVersion: 2 });
+            setSelected(next.start);
+            setMobilePanel('tree');
+            setServiceMenuOpen(false);
+            setNotice(
+              'Menú preparado con tu lista. Probá el recorrido y guardá el borrador antes de publicar.',
+            );
+            requestAnimationFrame(() => treeHeading.current?.focus({ preventScroll: true }));
+          }}
+        />
+      </WorkspaceDrawer>
       <WorkspaceDrawer open={issuesOpen} onClose={() => setIssuesOpen(false)} title="Revisar flujo">
         <div id="flow-issues">
           <p>
@@ -608,7 +638,16 @@ function FlowEditor({
             <p id="flow-publish-help" className="flow-help">
               {busy
                 ? 'Guardando cambios…'
-                : publishReason || 'Guardá y probá el borrador antes de publicar.'}
+                : publishReason ||
+                  (data.flow?.enabled ? (
+                    <>
+                      Activo para próximos mensajes. Si ya atendiste el chat,{' '}
+                      <Link href="/dashboard/conversaciones">abrí la conversación</Link> y elegí
+                      Reanudar flujo.
+                    </>
+                  ) : (
+                    'Guardá y probá el borrador antes de publicar.'
+                  ))}
             </p>
             <span id="flow-review-help">
               {issues.length > 0 && (
@@ -758,6 +797,16 @@ function FlowEditor({
                   </Button>
                 </div>
               </details>
+              {graph.nodes.length > 0 && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={!canEdit || busy}
+                  onClick={openServiceMenu}
+                >
+                  Crear menú de servicios y precios
+                </Button>
+              )}
             </div>
             <label className="flow-tree-search">
               <Search size={15} />
@@ -773,6 +822,9 @@ function FlowEditor({
                 <GitBranch size={36} />
                 <h3>Empezá por una bienvenida</h3>
                 <p>Agregá preguntas, respuestas y una opción para hablar con tu equipo.</p>
+                <Button type="button" disabled={!canEdit || busy} onClick={openServiceMenu}>
+                  Crear menú de servicios y precios
+                </Button>
                 <Button
                   type="button"
                   variant="outline"

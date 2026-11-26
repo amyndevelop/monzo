@@ -14,7 +14,12 @@ export function ConversationFlowControl({
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
+  const [notice, setNotice] = useState<{
+    text: string;
+    conversationId: string;
+    human: boolean;
+    state: string | null;
+  } | null>(null);
   const flow = thread.automation;
   if (!flow) return null;
   const human = flow.paused || flow.state === 'handoff' || flow.state === 'blocked';
@@ -41,18 +46,21 @@ export function ConversationFlowControl({
         onClick={async () => {
           setBusy(true);
           setError('');
-          setNotice('');
+          setNotice(null);
           try {
             await whatsappRequest(
               `${base}/conversations/${thread.conversation.id}/automation`,
               'POST',
               { action: human ? 'resume' : 'pause' },
             );
-            setNotice(
-              human
+            setNotice({
+              text: human
                 ? 'El flujo comenzará con el próximo mensaje del cliente.'
                 : 'Atención humana activada. Los envíos ya iniciados pueden completarse.',
-            );
+              conversationId: thread.conversation.id,
+              human: !human,
+              state: human ? null : flow.state,
+            });
             await onChange();
           } catch (error) {
             setError(error instanceof Error ? error.message : 'No pudimos cambiar el flujo.');
@@ -82,7 +90,11 @@ export function ConversationFlowControl({
       )}
       {flow.reason && <small>{flow.reason}</small>}
       {error && <small role="alert">{error}</small>}
-      {notice && <small role="status">{notice}</small>}
+      {notice &&
+        notice.conversationId === thread.conversation.id &&
+        notice.human === human &&
+        notice.state === flow.state &&
+        flow.enabled && <small role="status">{notice.text}</small>}
     </div>
   );
 }

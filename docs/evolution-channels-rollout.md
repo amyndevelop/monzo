@@ -1,6 +1,6 @@
 # Prueba de QR y texto en el Preview
 
-Estado al 26/11/2026: **el usuario ejecutó estos pasos en el VPS y confirmó vinculación, recepción y respuesta de texto en WhatsApp real** sobre la entrega `fb1bac6`. Los cuatro contenedores quedaron healthy y las comprobaciones firmadas fueron OK. Respaldo del vhost anterior: `/var/backups/monzo-evolution-nginx/cambio-9dfyopza`. Esta guía conserva el procedimiento; no repetir el alta para una conexión que ya funciona. Es una entrega parcial de la fase 3: adjuntos, historial anterior y recuperación/persistencia real siguen pendientes. La API oficial y el QR anterior conservan su implementación.
+Estado al 26/11/2026: **el usuario ejecutó estos pasos en el VPS y confirmó vinculación, recepción y respuesta de texto en WhatsApp real** sobre la entrega `fb1bac6`, también después de reiniciar Evolution/gateway. Los cuatro contenedores quedaron healthy y las comprobaciones firmadas fueron OK. Respaldo del vhost anterior: `/var/backups/monzo-evolution-nginx/cambio-9dfyopza`. Esta guía conserva el procedimiento; no repetir el alta para una conexión que ya funciona. Es una entrega parcial de la fase 3: adjuntos, historial anterior y recuperación ampliada siguen pendientes. La API oficial y el QR anterior conservan su implementación.
 
 El usuario confirmó la base independiente `monzo-evolution-test / neondb` con doce migraciones y ya accede al Preview con su cuenta verificada. No hay otra migración para esta entrega. Trabajar en `feat/evolution-conversations`; no integrar `main` ni cambiar Production.
 
@@ -71,14 +71,14 @@ Desde el número personal del cliente, escribir al secundario. Abrir Conversacio
 
 ## Recuperación
 
-La persistencia tras reiniciar sigue pendiente de comprobación física. En el entorno de pruebas se puede reiniciar únicamente Evolution y su gateway y esperar a que sus healthchecks terminen:
+El usuario ya comprobó la persistencia después de reiniciar únicamente Evolution y su gateway y confirmó de nuevo conexión y mensajes. El procedimiento que ejecutó fue:
 
 ```bash
 ./scripts/evolution-channels-compose.sh restart evolution evolution-gateway && \
 ./scripts/evolution-channels-compose.sh up -d --wait evolution evolution-gateway
 ```
 
-Después comprobar en el Preview que vuelve a Conectado sin escanear otro QR, enviar un texto nuevo desde el número personal y responder desde MONZO. Esto verifica por separado persistencia del vínculo y tráfico después del reinicio; el healthcheck por sí solo no demuestra ninguna de las dos. No se borra ningún volumen ni se reinicia el VPS. El resultado todavía debe confirmarlo el operador.
+La verificación posterior consiste en volver a Conectado sin escanear otro QR, enviar un texto nuevo desde el número personal y responder desde MONZO. El operador confirmó que todo funcionó. Esto verifica por separado persistencia del vínculo y tráfico después del reinicio; el healthcheck por sí solo no demuestra ninguna de las dos. No se borró ningún volumen ni se reinició el VPS completo. La recuperación después de un reinicio del sistema operativo no se ha probado todavía.
 
 Si falla un envío después de contactar al proveedor, queda sin confirmar; no se reenvía automáticamente. Revisar la conversación antes de crear otro envío. Un recibo posterior puede reconciliar el estado. Los eventos se conservan cifrados hasta recibir confirmación firmada de MONZO. Desconectar o volver a vincular cancela pendientes aún no reclamados.
 
