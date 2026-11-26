@@ -34,6 +34,34 @@ En Neon mantener seleccionada **monzo-evolution-test**, abrir **Connect** y copi
 
 Después de guardar será necesario un despliegue nuevo del Preview para recibir el cambio. DATABASE_URL por sí sola no completa la autenticación ni habilita QR: siguen pendientes las variables privadas del Preview, su origen de autenticación, el transporte durable y la integración de Canales. No cambiar todavía el destino fijo del gateway del VPS; ese paso requiere preparar y comprobar el nuevo origen completo.
 
+La captura posterior del usuario muestra **DATABASE_URL en Preview**. No muestra el alcance Git ni permite verificar el valor/conexión runtime. Otra captura confirmó un despliegue Ready de `feat/evolution-conversations`, commit `e0fcc9d`, con el origen fijo **https://monzo-v-git-feat-evolution-conversations-arqen2.vercel.app**. Usar ese origen de rama para BETTER_AUTH_URL; el dominio con hash identifica un deployment puntual y no es el origen de trabajo.
+
+### Preparar las claves privadas del acceso de pruebas
+
+`scripts/prepare-evolution-preview.mjs` genera una vez **BETTER_AUTH_SECRET** y **WHATSAPP_ENCRYPTION_KEY**, independientes entre sí y de los secretos del VPS, y conserva **BETTER_AUTH_URL** de esta rama. Los tres valores se guardan en `.evolution/preview-conversations.env`, archivo privado 0600 bajo directorio 0700 ignorado por Git. Repetir conserva exactamente el archivo; si otro origen, un enlace, permisos amplios o cambios manuales no compatibles aparecen, se detiene sin sobrescribirlo. La publicación inicial del archivo usa un enlace exclusivo para impedir que dos preparaciones concurrentes roten las claves. No imprime valores ni copia DATABASE_URL, SMTP, API keys, bypass o contraseñas de Evolution. Tampoco modifica `.env.evolution`, su destino de retorno o los servicios.
+
+El checkout del VPS se clonó con `--single-branch` y sigue en la rama de Etapa 2. Para incorporar esta rama sin perder los archivos privados ignorados ni reiniciar el stack, agregarla a las referencias de Git, obtenerla y cambiar de rama:
+
+```bash
+cd ~/monzo-evolution && git remote set-branches --add origin feat/evolution-conversations && git fetch origin && git switch feat/evolution-conversations
+```
+
+Después, desde esa carpeta, ejecutar el helper offline con el motor rootless dedicado. El usuario 0 del contenedor corresponde al adminuh del host y puede leer su archivo privado; el bind de trabajo permite escribir el archivo nuevo mientras la raíz del contenedor queda de solo lectura:
+
+```bash
+./scripts/evolution-docker.sh run --rm --network none --read-only --user 0:0 \
+  --mount "type=bind,src=$PWD,dst=/workspace" --workdir /workspace \
+  node:24-bookworm-slim@sha256:873f586f3794f52281bd039bf02c048a0be08fde619338f9941bad1eb6b34530 \
+  node scripts/prepare-evolution-preview.mjs \
+  --monzo-origin https://monzo-v-git-feat-evolution-conversations-arqen2.vercel.app
+```
+
+Los valores se ingresan privadamente en Vercel, **solo Preview → feat/evolution-conversations**; no compartir el archivo ni capturas de sus valores. Si se cargan uno a uno, pegar el valor sin comillas. Si se pega el contenido `.env` completo mediante el importador del campo Key de Vercel, las comillas pertenecen a la sintaxis del archivo y el importador las procesa. La cuenta nueva de pruebas también necesita SMTP válido para su verificación de correo: SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_FROM, SMTP_USER y SMTP_PASSWORD según el proveedor. No desactivar la verificación para resolver una configuración incompleta.
+
+Las cuatro pruebas nuevas del helper y las 32 anteriores pasaron (36): independencia y estabilidad, permisos/propietario, rechazo de producción, origen distinto, enlaces y archivos modificados, CLI sin filtraciones y configuración original del gateway intacta. Las pruebas usan directorios temporales y transporte local controlado, no el archivo real del VPS. La preparación real y carga de esas tres variables siguen pendientes del operador.
+
+También se comprobó dos veces el cambio desde un clon single-branch local, conservando un archivo privado ignorado. El helper se ejecutó con la imagen Node fijada, sin red, raíz de solo lectura y un bind privado de fixture, con el UID propietario: archivo 0600 creado y fuente intacta. Esa ejecución usa Docker local de pruebas y no se presenta como ejecución del comando rootless en el VPS.
+
 La rama de Etapa 3 tendrá su propio Preview y origen de autenticación. Los tres valores de conexión específicos de la rama de Etapa 2 no deben considerarse automáticamente disponibles en esta rama. Antes de operar habrá que preparar variables de Preview, base vacía de pruebas con sus migraciones y destino fijo del gateway. El setup de Etapa 2 rechaza un cambio de origen silencioso: preparar un cambio revisable que conserve las claves, no borrar su configuración para forzarlo. No hay cambio de destino del VPS autorizado ni realizado por este desarrollo local.
 
 ## Prueba personal y contenidos
